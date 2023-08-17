@@ -26,6 +26,9 @@ func NewService(db *gorm.DB) *Service {
 
 func (srv *Service) List(params *ListReq) (total int64, list []*model.Environment, err error) {
 	_db := srv.db.Model(&model.Environment{}).Where(model.Environment{SpaceId: params.SpaceId})
+	if params.Kw != "" {
+		_db = _db.Where("name like ", "\""+params.Kw+"\"")
+	}
 	err = _db.Count(&total).Error
 	if err != nil || total == 0 {
 		return

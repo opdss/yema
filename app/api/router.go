@@ -9,7 +9,7 @@ import (
 	"strings"
 	"yema.dev/app/api/middleware"
 	"yema.dev/app/global"
-	"yema.dev/app/internal/constants"
+	"yema.dev/app/model"
 	"yema.dev/app/service/deploy"
 	"yema.dev/app/service/environment"
 	"yema.dev/app/service/login"
@@ -71,9 +71,9 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 	authRouter.POST("/logout", loginCtl.Logout)
 	authRouter.GET("/user_info", loginCtl.UserInfo)
 
-	superPermRouter := authRouter.Group("", middleware.Permission(userService, constants.RoleSuper))
-	ownerPermRouter := authRouter.Group("", middleware.Permission(userService, constants.RoleOwner))
-	masterPermRouter := authRouter.Group("", middleware.Permission(userService, constants.RoleMaster))
+	superPermRouter := authRouter.Group("", middleware.Permission(userService, model.RoleSuper))
+	ownerPermRouter := authRouter.Group("", middleware.Permission(userService, model.RoleOwner))
+	masterPermRouter := authRouter.Group("", middleware.Permission(userService, model.RoleMaster))
 	//developerPermMid := middleware.Permission(constants.RoleDeveloper)
 
 	//用户管理
@@ -88,7 +88,7 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 
 	//成员管理
 	{
-		ctl := &MemberCtl{service: member.NewService()}
+		ctl := &MemberCtl{service: member.NewService(global.DB)}
 		ownerPermRouter.GET("/member", ctl.List)
 		ownerPermRouter.POST("/member", ctl.Store)
 		ownerPermRouter.DELETE("/member/:id", ctl.Delete)

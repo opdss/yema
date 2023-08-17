@@ -27,6 +27,7 @@ func (r *UpdateReq) Fields() []string {
 }
 
 type ListReq struct {
-	SpaceId int64 `json:"-" binding:"required,gt=0"`
+	SpaceId int64  `json:"-" binding:"required,gt=0"`
+	Kw      string `json:"kw" binding:"omitempty,max=100"`
 	db.Paginator
 }

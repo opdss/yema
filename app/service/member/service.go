@@ -6,7 +6,6 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"sync"
-	"yema.dev/app/global"
 	"yema.dev/app/model"
 	"yema.dev/app/service/common"
 )
@@ -20,9 +19,9 @@ type Service struct {
 	db *gorm.DB
 }
 
-func NewService() *Service {
+func NewService(db *gorm.DB) *Service {
 	onceService.Do(func() {
-		service = &Service{db: global.DB}
+		service = &Service{db: db}
 	})
 	return service
 }

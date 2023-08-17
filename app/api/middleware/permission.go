@@ -5,12 +5,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	ctx2 "yema.dev/app/api/ctx"
-	"yema.dev/app/internal/constants"
 	"yema.dev/app/model"
 	"yema.dev/app/service/user"
 )
 
-func Permission(userService *user.Service, role constants.Role) func(ctx *gin.Context) {
+func Permission(userService *user.Service, role model.Role) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		log.Println("middleware Permission start")
 		userId := ctx2.UserId(ctx)
@@ -26,7 +25,7 @@ func Permission(userService *user.Service, role constants.Role) func(ctx *gin.Co
 				return
 			}
 			currRole := member.Role
-			if constants.Role(currRole).Level() < role.Level() {
+			if model.Role(currRole).Level() < role.Level() {
 				_ = ctx.AbortWithError(401, errors.New("你没有权限访问该空间，请联系相关负责人"))
 				return
 			}

@@ -18,7 +18,7 @@ export const columns: BasicColumn[] = [
     customRender: ({ record }) => record.environment.name,
   },
   {
-    title: '空间',
+    title: '所属空间',
     dataIndex: 'space',
     customRender: ({ record }) => record.space.name,
   },
@@ -29,7 +29,7 @@ export const columns: BasicColumn[] = [
   {
     title: '创建时间',
     dataIndex: 'created_at',
-    format: (val) => formatToDateTime(val)
+    format: (val) => formatToDateTime(val),
   },
 ];
 
