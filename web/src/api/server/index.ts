@@ -11,7 +11,7 @@ enum Api {
   ServerId = '/server/{id}',
   ServerSshWs = 'ws://localhost:8989/api/server/{id}/terminal',
   ServerCheck =  "/server/{id}/check",
-  ServerSetLogin =  "/server/setting",
+  ServerSetLogin =  "/server/set_authorized",
 }
 
 export const getServerListByPage = (params?: ListReq) =>

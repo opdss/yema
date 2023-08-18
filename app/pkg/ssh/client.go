@@ -53,6 +53,7 @@ func newSshClient(sh *Ssh, conf *ServerConfig) (_ *client, err error) {
 	return &client{
 		serverConfig: conf,
 		client:       sshClient,
+		sh:           sh,
 	}, nil
 }
 

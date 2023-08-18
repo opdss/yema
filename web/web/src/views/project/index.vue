@@ -6,11 +6,24 @@
             </template>
             <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'action'">
-                    <TableAction :actions="[ { label:"检测", onClick: handleEdit.bind(null, record),
-                    }, { icon: 'clarity:note-edit-line', onClick: handleEdit.bind(null, record), },
-                    { icon: 'ant-design:delete-outlined', color: 'error', popConfirm: { title:
-                    '是否确认删除', placement: 'left', confirm: handleDelete.bind(null, record), },
-                    }, ]" />
+                    <TableAction
+                        :actions="[
+                            {
+                                icon: 'clarity:note-edit-line',
+                                onClick: handleEdit.bind(null, record),
+                            },
+                            {
+                                icon: 'ant-design:delete-outlined',
+                                color: 'error',
+                                popConfirm: {
+                                    title: '是否确认删除',
+                                    placement: 'left',
+                                    confirm: handleDelete.bind(null, record),
+                                },
+                            },
+                        ]"
+                        :dropDownActions="dropDownActions(record)"
+                    />
                 </template>
             </template>
         </BasicTable>
@@ -23,6 +36,7 @@ import { columns, searchFormSchema } from './data';
 import { useMessage } from '/@/hooks/web/useMessage';
 import { getProjectListByPage, deleteProject } from '/@/api/project';
 import { useGo } from '/@/hooks/web/usePage';
+import { RoleMaster } from '/@/enums/roleEnum';
 
 export default defineComponent({
     name: 'ProjectManagement',
@@ -51,6 +65,20 @@ export default defineComponent({
             },
         });
 
+        function handleCheck(record: Recordable) {
+            openModalCheck(true, record);
+        }
+
+        function dropDownActions(record: Recordable): ActionItem[] {
+            return [
+                {
+                    icon: 'ant-design:check-square-outlined',
+                    label: '检测',
+                    onClick: handleCheck.bind(null, record),
+                },
+            ];
+        }
+
         function handleCreate() {
             go('/project/create');
         }
@@ -76,6 +104,7 @@ export default defineComponent({
             handleEdit,
             handleDelete,
             handleSuccess,
+            dropDownActions,
         };
     },
 });

@@ -107,6 +107,8 @@ func (s *Ssh) newClient(conf ServerConfig) (sc *client, err error) {
 }
 
 func (s *Ssh) removeClient(conf *ServerConfig) {
+	fmt.Println(s)
+	fmt.Println(s.mux)
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	key := conf.String()

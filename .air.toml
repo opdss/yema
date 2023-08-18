@@ -5,7 +5,7 @@ tmp_dir = "runtime"
   bin = "./runtime/yema run --defaults=dev"
   cmd = "go build -race -o ./runtime/yema ."
   delay = 1000
-  exclude_dir = ["runtime", "web"]
+  exclude_dir = ["runtime", "web", "webs"]
   exclude_file = []
   exclude_regex = []
   exclude_unchanged = false
