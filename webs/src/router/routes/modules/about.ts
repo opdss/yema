@@ -11,16 +11,16 @@ const about: AppRouteModule = {
   meta: {
     hideChildrenInMenu: true,
     icon: 'simple-icons:about-dot-me',
-    title: t('routes.dashboard.about'),
+    title: t('routes.basic.about'),
     orderNo: 100000,
   },
   children: [
     {
       path: 'index',
       name: 'AboutPage',
-      component: () => import('/@/views/sys/about/index.vue'),
+      component: () => import('/@/views/about/index.vue'),
       meta: {
-        title: t('routes.dashboard.about'),
+        title: t('routes.basic.about'),
         icon: 'simple-icons:about-dot-me',
         hideMenu: true,
       },

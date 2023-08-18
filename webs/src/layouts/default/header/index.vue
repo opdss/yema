@@ -33,7 +33,10 @@
 
     <!-- action  -->
     <div :class="`${prefixCls}-action`">
-      <AppSearch :class="`${prefixCls}-action__item `" v-if="getShowSearch" />
+
+      <AppSpacePicker
+        :class="`${prefixCls}-action__item`"
+      />
 
       <ErrorAction v-if="getUseErrorHandle" :class="`${prefixCls}-action__item error-action`" />
 
@@ -64,15 +67,13 @@
   import LayoutMenu from '../menu/index.vue';
   import LayoutTrigger from '../trigger/index.vue';
 
-  import { AppSearch } from '/@/components/Application';
-
   import { useHeaderSetting } from '/@/hooks/setting/useHeaderSetting';
   import { useMenuSetting } from '/@/hooks/setting/useMenuSetting';
   import { useRootSetting } from '/@/hooks/setting/useRootSetting';
 
   import { MenuModeEnum, MenuSplitTyeEnum } from '/@/enums/menuEnum';
   import { SettingButtonPositionEnum } from '/@/enums/appEnum';
-  import { AppLocalePicker } from '/@/components/Application';
+  import { AppLocalePicker, AppSpacePicker } from '/@/components/Application';
 
   import { UserDropDown, LayoutBreadcrumb, FullScreen, Notify, ErrorAction } from './components';
   import { useAppInject } from '/@/hooks/web/useAppInject';
@@ -91,9 +92,9 @@
       LayoutMenu,
       UserDropDown,
       AppLocalePicker,
+      AppSpacePicker,
       FullScreen,
       Notify,
-      AppSearch,
       ErrorAction,
       SettingDrawer: createAsyncComponent(() => import('/@/layouts/default/setting/index.vue'), {
         loading: true,

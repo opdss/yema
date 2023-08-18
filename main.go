@@ -21,12 +21,12 @@ import (
 
 //go:generate stringer -type ErrCode -linecomment ./app/internal/errcode
 
-//go:embed web/dist/*
+//go:embed webs/dist/*
 var web embed.FS
 
 // 多加这个是因为前端打包的资源里面包含了_开头的文件
 //
-//go:embed web/dist/assets/*
+//go:embed webs/dist/assets/*
 var webAssets embed.FS
 
 var (

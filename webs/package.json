@@ -29,7 +29,6 @@
     "lint:eslint": "eslint --cache --max-warnings 0  \"{src,mock}/**/*.{vue,ts,tsx}\" --fix",
     "lint:prettier": "prettier --write .",
     "lint:stylelint": "stylelint \"**/*.{vue,css,less.scss}\" --fix --cache --cache-location node_modules/.cache/stylelint/",
-    "prepare": "husky install",
     "preview": "npm run build && vite preview",
     "reinstall": "rimraf pnpm-lock.yaml && rimraf package.lock.json && rimraf node_modules && npm run bootstrap",
     "serve": "npm run dev",
@@ -80,6 +79,7 @@
     "codemirror": "^5.65.12",
     "cropperjs": "^1.5.13",
     "crypto-js": "^4.1.1",
+    "d3": "^7.8.3",
     "dayjs": "^1.11.7",
     "echarts": "^5.4.2",
     "exceljs": "^4.3.0",
@@ -106,7 +106,9 @@
     "vxe-table": "^4.3.11",
     "vxe-table-plugin-export-xlsx": "^3.0.4",
     "xe-utils": "^3.5.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xterm": "^5.1.0",
+    "xterm-addon-fit": "^0.7.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.5.1",
@@ -133,7 +135,6 @@
     "cross-env": "^7.0.3",
     "cz-git": "^1.6.1",
     "czg": "^1.6.1",
-    "husky": "^8.0.3",
     "lint-staged": "13.2.0",
     "prettier": "^2.8.7",
     "prettier-plugin-packagejson": "^2.4.3",

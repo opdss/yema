@@ -4,25 +4,36 @@ import { defineStore } from 'pinia';
 import { store } from '/@/store';
 import { RoleEnum } from '/@/enums/roleEnum';
 import { PageEnum } from '/@/enums/pageEnum';
-import { ROLES_KEY, TOKEN_KEY, USER_INFO_KEY } from '/@/enums/cacheEnum';
+import {
+  ROLES_KEY,
+  TOKEN_KEY,
+  USER_INFO_KEY,
+  CURRENT_SPACE_ID_KEY,
+  REFRESH_TOKEN_KEY,
+  ROLE_KEY,
+  SPACES_KEY,
+} from '/@/enums/cacheEnum';
 import { getAuthCache, setAuthCache } from '/@/utils/auth';
-import { GetUserInfoModel, LoginParams } from '/@/api/sys/model/userModel';
-import { doLogout, getUserInfo, loginApi } from '/@/api/sys/user';
+import { GetUserInfoModel, LoginParams, SpaceInfo } from '/@/api/login/model';
+import { doLogout, getUserInfo, loginApi, refreshToken } from '/@/api/login';
 import { useI18n } from '/@/hooks/web/useI18n';
 import { useMessage } from '/@/hooks/web/useMessage';
 import { router } from '/@/router';
 import { usePermissionStore } from '/@/store/modules/permission';
 import { RouteRecordRaw } from 'vue-router';
 import { PAGE_NOT_FOUND_ROUTE } from '/@/router/routes/basic';
-import { isArray } from '/@/utils/is';
 import { h } from 'vue';
 
 interface UserState {
   userInfo: Nullable<UserInfo>;
   token?: string;
+  refreshToken?: string;
   roleList: RoleEnum[];
   sessionTimeout?: boolean;
   lastUpdateTime: number;
+  role: string;
+  currentSpaceId: number;
+  spaces: SpaceInfo[];
 }
 
 export const useUserStore = defineStore({
@@ -32,12 +43,16 @@ export const useUserStore = defineStore({
     userInfo: null,
     // token
     token: undefined,
+    refreshToken: undefined,
     // roleList
     roleList: [],
     // Whether the login expired
     sessionTimeout: false,
     // Last fetch time
     lastUpdateTime: 0,
+    role: '',
+    currentSpaceId: 0,
+    spaces: [],
   }),
   getters: {
     getUserInfo(state): UserInfo {
@@ -45,6 +60,9 @@ export const useUserStore = defineStore({
     },
     getToken(state): string {
       return state.token || getAuthCache<string>(TOKEN_KEY);
+    },
+    getRefreshToken(state): string {
+      return state.refreshToken || getAuthCache<string>(REFRESH_TOKEN_KEY);
     },
     getRoleList(state): RoleEnum[] {
       return state.roleList.length > 0 ? state.roleList : getAuthCache<RoleEnum[]>(ROLES_KEY);
@@ -55,11 +73,24 @@ export const useUserStore = defineStore({
     getLastUpdateTime(state): number {
       return state.lastUpdateTime;
     },
+    getRole(state): string {
+      return state.role || getAuthCache<string>(ROLE_KEY);
+    },
+    getCurrentSpaceId(state): number {
+      return state.currentSpaceId || getAuthCache<number>(CURRENT_SPACE_ID_KEY);
+    },
+    getSpaces(state): SpaceInfo[] {
+      return state.spaces || getAuthCache<SpaceInfo[]>(SPACES_KEY) || [];
+    },
   },
   actions: {
     setToken(info: string | undefined) {
       this.token = info ? info : ''; // for null or undefined value
       setAuthCache(TOKEN_KEY, info);
+    },
+    setRefreshToken(info: string | undefined) {
+      this.refreshToken = info ? info : ''; // for null or undefined value
+      setAuthCache(REFRESH_TOKEN_KEY, info);
     },
     setRoleList(roleList: RoleEnum[]) {
       this.roleList = roleList;
@@ -68,10 +99,27 @@ export const useUserStore = defineStore({
     setUserInfo(info: UserInfo | null) {
       this.userInfo = info;
       this.lastUpdateTime = new Date().getTime();
+      if (info != null) {
+        this.setRole(info.role);
+        this.setCurrentSpaceId(info.current_space_id);
+        this.setSpaces(info.spaces);
+      }
       setAuthCache(USER_INFO_KEY, info);
     },
     setSessionTimeout(flag: boolean) {
       this.sessionTimeout = flag;
+    },
+    setRole(role: string) {
+      this.role = role;
+      setAuthCache(ROLE_KEY, role);
+    },
+    setCurrentSpaceId(currentSpaceId: number) {
+      this.currentSpaceId = currentSpaceId;
+      setAuthCache(CURRENT_SPACE_ID_KEY, currentSpaceId);
+    },
+    setSpaces(spaces: SpaceInfo[]) {
+      this.spaces = spaces;
+      setAuthCache(SPACES_KEY, spaces);
     },
     resetState() {
       this.userInfo = null;
@@ -91,10 +139,13 @@ export const useUserStore = defineStore({
       try {
         const { goHome = true, mode, ...loginParams } = params;
         const data = await loginApi(loginParams, mode);
-        const { token } = data;
+        const { token, refresh_token } = data;
 
         // save token
         this.setToken(token);
+        if (refresh_token) {
+          this.setRefreshToken(refresh_token);
+        }
         return this.afterLoginAction(goHome);
       } catch (error) {
         return Promise.reject(error);
@@ -125,14 +176,17 @@ export const useUserStore = defineStore({
     async getUserInfoAction(): Promise<UserInfo | null> {
       if (!this.getToken) return null;
       const userInfo = await getUserInfo();
-      const { roles = [] } = userInfo;
-      if (isArray(roles)) {
-        const roleList = roles.map((item) => item.value) as RoleEnum[];
-        this.setRoleList(roleList);
-      } else {
-        userInfo.roles = [];
-        this.setRoleList([]);
-      }
+      // const { roles = [] } = userInfo;
+      const { role } = userInfo;
+      this.setRoleList([role as RoleEnum]);
+      // console.log("setRoleList", [role] as RoleEnum[])
+      // if (isArray(roles)) {
+      //   const roleList = roles.map((item) => item.value) as RoleEnum[];
+      //   this.setRoleList(roleList);
+      // } else {
+      //   userInfo.roles = [];
+      //   this.setRoleList([]);
+      // }
       this.setUserInfo(userInfo);
       return userInfo;
     },
@@ -151,6 +205,18 @@ export const useUserStore = defineStore({
       this.setSessionTimeout(false);
       this.setUserInfo(null);
       goLogin && router.push(PageEnum.BASE_LOGIN);
+    },
+
+    async doRefreshToken() {
+      if (this.refreshToken) {
+        const data = await refreshToken(this.refreshToken);
+        const { token, refresh_token } = data;
+        this.setToken(token);
+        this.setRefreshToken(refresh_token);
+        return;
+      } else {
+        throw new Error('refresh empty');
+      }
     },
 
     /**

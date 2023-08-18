@@ -41,7 +41,7 @@ func RegisterRoutes(e *gin.Engine, server *Server) {
 
 // 静态文件处理
 func fileHandle(ctx *gin.Context, fs *embed.FS, file string) {
-	file = "web/dist/" + strings.TrimPrefix(file, "/")
+	file = "webs/dist/" + strings.TrimPrefix(file, "/")
 	f, err := fs.Open(file)
 	if err != nil {
 		ctx.AbortWithStatus(404)
