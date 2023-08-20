@@ -35,7 +35,7 @@
   import { useModal } from '/@/components/Modal';
   import ServerModal from './Modal.vue';
   import { columns } from './data';
-  import {getSpaceListByPage, deleteSpace} from "/@/api/space"
+  import { getSpaceListByPage, deleteSpace } from '/@/api/space';
   import { useMessage } from '/@/hooks/web/useMessage';
 
   export default defineComponent({
@@ -74,10 +74,10 @@
       }
 
       function handleDelete(record: Recordable) {
-        deleteSpace(record.id).then(()=>{
-          createMessage.success("删除成功")
-          reload()
-        })
+        deleteSpace(record.id).then(() => {
+          createMessage.success('删除成功');
+          reload();
+        });
       }
 
       function handleSuccess() {

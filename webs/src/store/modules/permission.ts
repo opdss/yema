@@ -13,7 +13,6 @@ import projectSetting from '/@/settings/projectSetting';
 import { PermissionModeEnum } from '/@/enums/appEnum';
 
 import { asyncRoutes } from '/@/router/routes';
-import { ERROR_LOG_ROUTE } from '/@/router/routes/basic';
 
 import { filter } from '/@/utils/helper/treeHelper';
 
@@ -229,7 +228,7 @@ export const usePermissionStore = defineStore({
         //   break;
       }
 
-      routes.push(ERROR_LOG_ROUTE);
+      //routes.push(ERROR_LOG_ROUTE);
       patchHomeAffix(routes);
       return routes;
     },

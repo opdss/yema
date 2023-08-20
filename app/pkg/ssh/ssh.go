@@ -28,11 +28,11 @@ type Ssh struct {
 }
 
 func NewSSH(conf *Config) (*Ssh, error) {
-	return &Ssh{
+	sh := &Ssh{
 		config:  conf,
 		mux:     &sync.Mutex{},
 		clients: make(map[string]*client),
-	}, nil
+	}
 
 	//go func() {
 	//	tk := time.NewTicker(time.Second * 3)
@@ -40,16 +40,17 @@ func NewSSH(conf *Config) (*Ssh, error) {
 	//	for {
 	//		select {
 	//		case <-tk.C:
-	//			if len(clients) == 0 {
+	//			if len(sh.clients) == 0 {
 	//				fmt.Printf("当前clients:[0] \r\n")
 	//			} else {
-	//				for _, v := range clients {
-	//					fmt.Printf("当前clients:[%s], sessions:[%d]\r\n", v.serverConfig.String(), len(v.sessions))
+	//				for _, v := range sh.clients {
+	//					fmt.Printf("当前clients:[%s], sessions:[%d]\r\n", v.serverConfig.String(), v.ref)
 	//				}
 	//			}
 	//		}
 	//	}
 	//}()
+	return sh, nil
 }
 
 func (s *Ssh) IdentitySigners() (signers []ssh.Signer, err error) {

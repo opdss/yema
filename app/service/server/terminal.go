@@ -167,8 +167,10 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 				_, msg, err = wsConn.ReadMessage()
 				if err != nil {
 					cancel()
+					srv.log.Error("ws.ReadMessage err:", zap.Error(err))
 					return
 				}
+				fmt.Println(msg)
 				wsMsg := new(TerminalWsMsg)
 				if err = json.Unmarshal(msg, wsMsg); err != nil {
 					continue
@@ -182,6 +184,7 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 				}
 				if err != nil {
 					cancel()
+					srv.log.Error("sshTerminal command err:", zap.Error(err))
 					return
 				}
 			}
@@ -200,9 +203,10 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 			default:
 				x, size, err := br.ReadRune()
 				if err != nil {
-					cancel()
-					srv.log.Error("处理shell消息出错", zap.Error(err))
-					return
+					//cancel()
+					srv.log.Error("读取终端消息出错", zap.Error(err))
+					//return
+					continue
 				}
 				if size > 0 {
 					r <- x
@@ -226,7 +230,7 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 				buf = []byte{}
 				if err != nil {
 					cancel()
-					srv.log.Error("ws.WriteMessage:", zap.Error(err))
+					srv.log.Error("ws.WriteMessage err:", zap.Error(err))
 					return
 				}
 				connectTimeoutT.Reset(connectTimeout)

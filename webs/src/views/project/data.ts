@@ -1,10 +1,9 @@
-import { BasicColumn } from '/@/components/Table';
-import { FormSchema } from '/@/components/Table';
-import {getEnvironmentOptions} from "/@/api/environment";
-import {getServerListByPage} from "/@/api/server";
+import { BasicColumn, FormSchema } from '/@/components/Table';
+import { getEnvironmentOptions } from '/@/api/environment';
+import { getServerListByPage } from '/@/api/server';
 // import {h} from "vue"
 // import { CodeEditor } from '/@/components/CodeEditor';
-import {formatToDateTime} from "/@/utils/dateUtil";
+import { formatToDateTime } from '/@/utils/dateUtil';
 //import { MarkDown } from '/@/components/MarkDown';
 export const columns: BasicColumn[] = [
   {
@@ -29,7 +28,7 @@ export const columns: BasicColumn[] = [
   {
     title: '创建时间',
     dataIndex: 'created_at',
-    format: (val) => formatToDateTime(val)
+    format: (val) => formatToDateTime(val),
   },
 ];
 
@@ -42,7 +41,6 @@ export const searchFormSchema: FormSchema[] = [
   },
 ];
 
-
 export const formIdSchema: FormSchema = {
   field: 'id',
   label: 'ID',
@@ -54,15 +52,14 @@ export const formIdSchema: FormSchema = {
   },
 };
 
-export const formSchemas: {[key:string]: FormSchema[]} = {
-  "基础配置": [
+export const formSchemas: { [key: string]: FormSchema[] } = {
+  基础配置: [
     {
       field: 'name',
       component: 'Input',
       label: '名称',
       required: true,
-      colProps: {
-      },
+      colProps: {},
     },
     {
       label: '环境',
@@ -82,7 +79,7 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
       component: 'RadioButtonGroup',
       required: true,
       defaultValue: 'git',
-      componentProps:{
+      componentProps: {
         options: [
           {
             label: 'Git',
@@ -91,26 +88,25 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
           {
             label: 'Svn',
             value: 'svn',
-          },],
+          },
+        ],
       },
-      colProps: {
-      },
+      colProps: {},
     },
     {
       label: '仓库地址',
       field: 'repo_url',
       component: 'Input',
       required: true,
-      colProps: {
-      },
+      colProps: {},
     },
     {
       label: '上线方式',
       field: 'repo_mode',
       component: 'RadioButtonGroup',
       required: true,
-      defaultValue:"tag",
-      componentProps:{
+      defaultValue: 'tag',
+      componentProps: {
         options: [
           {
             label: 'Tag',
@@ -119,7 +115,8 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
           {
             label: 'Branch',
             value: 'branch',
-          },],
+          },
+        ],
       },
     },
     {
@@ -127,32 +124,30 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
       field: 'task_audit',
       component: 'Switch',
       required: true,
-      defaultValue:1,
-      componentProps:{
-        checkedChildren:"是",
-        unCheckedChildren:"否",
+      defaultValue: 1,
+      componentProps: {
+        checkedChildren: '是',
+        unCheckedChildren: '否',
         checkedValue: 1,
         unCheckedValue: 2,
       },
-      colProps: {
-      },
+      colProps: {},
     },
     {
       field: 'description',
       component: 'InputTextArea',
       label: '项目简介',
-      colProps: {
-      },
+      colProps: {},
     },
   ],
-  '服务器配置' : [
+  服务器配置: [
     {
       label: '选择服务器',
       field: 'server_ids',
       component: 'ApiTransfer',
       required: true,
       componentProps: {
-        api:getServerListByPage,
+        api: getServerListByPage,
         params: {
           page_size: 1000,
         },
@@ -168,9 +163,9 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
         //   }
         //   return res.items
         // },
-        resultField: "items",
-        labelField: "name",
-        valueField: "id",
+        resultField: 'items',
+        labelField: 'name',
+        valueField: 'id',
         listStyle: {
           width: '280px',
           height: '320px',
@@ -181,14 +176,16 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
       label: '目标集群部署仓库',
       field: 'target_releases',
       component: 'Input',
-      helpMessage: '部署服务器存放每个版本的代码的目录，target_root将会建立一个软链接指向到这里的某个版本目录',
+      helpMessage:
+        '部署服务器存放每个版本的代码的目录，target_root将会建立一个软链接指向到这里的某个版本目录',
       required: true,
     },
     {
       label: '目标集群部署路径',
       field: 'target_root',
       component: 'Input',
-      helpMessage: '部署服务器目标路径，该值对应比如nginx的root，是一个软链接，配置时不应该存在，由发布系统自动创建',
+      helpMessage:
+        '部署服务器目标路径，该值对应比如nginx的root，是一个软链接，配置时不应该存在，由发布系统自动创建',
       required: true,
     },
     {
@@ -199,7 +196,7 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
       required: true,
     },
   ],
-  "高级配置" : [
+  高级配置: [
     {
       label: '排除文件',
       field: 'excludes',
@@ -245,6 +242,5 @@ export const formSchemas: {[key:string]: FormSchema[]} = {
     //     });
     //   },
     // },
-  ]
-}
-
+  ],
+};

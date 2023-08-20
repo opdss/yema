@@ -14,7 +14,7 @@
 
         <div class="py-4 px-4 flex justify-between items-center">
           <CountTo prefix="$" :startVal="1" :endVal="item.value" class="text-2xl" />
-          <Icon :icon="item.icon" :size="40" />
+          <SvgIcon :name="item.icon" :size="40" />
         </div>
 
         <div class="p-2 px-4 flex justify-between">
@@ -27,7 +27,7 @@
 </template>
 <script lang="ts" setup>
   import { CountTo } from '/@/components/CountTo/index';
-  import { Icon } from '/@/components/Icon';
+  import { SvgIcon } from '/@/components/Icon';
   import { Tag, Card } from 'ant-design-vue';
   import { growCardList } from '../data';
 
