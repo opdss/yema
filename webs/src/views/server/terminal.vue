@@ -55,8 +55,6 @@
   setTitle('终端:' + serverHost);
   const userStore = useUserStore();
 
-  console.log(111111, userStore.getToken, userStore.getCurrentSpaceId.toString());
-  //const { status, send, close:wsClose, open: wsOpen } = useWebSocket("wss://echo.websocket.events", {
   const {
     status,
     send,
@@ -64,10 +62,11 @@
     open: wsOpen,
   } = useWebSocket(getServerSshWs(serverId), {
     autoReconnect: false,
-    heartbeat: {
-      message: '{"typ":"ping"}',
-      interval: 3000,
-    },
+    //heartbeat: true,
+    // heartbeat: {
+    //   message: '{"typ":"ping"}',
+    //   interval: 1000,
+    // },
     immediate: false,
     protocols: [userStore.getToken, userStore.getCurrentSpaceId.toString()],
     onConnected: () => {
@@ -76,7 +75,7 @@
     onError: (ws, event) => {
       termWrite(`\x1b[31mwebsocket连接失败：${ws.url}\x1b[m\r\n`);
     },
-    onDisconnected: () => {
+    onDisconnected: (ws, e) => {
       termWrite(`\x1b[31mwebsocket关闭\x1b[m\r\n`);
     },
     onMessage: (ws, event) => {
@@ -124,6 +123,7 @@
   };
 
   watchEffect(() => {
+    console.log('status.value', status.value);
     if (status.value == 'CONNECTING') {
       loading.value = true;
     } else {

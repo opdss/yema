@@ -170,7 +170,6 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 					srv.log.Error("ws.ReadMessage err:", zap.Error(err))
 					return
 				}
-				fmt.Println(msg)
 				wsMsg := new(TerminalWsMsg)
 				if err = json.Unmarshal(msg, wsMsg); err != nil {
 					continue
@@ -179,6 +178,7 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 				case wsMsgTypeResize:
 					err = sshTerminal.WindowChange(wsMsg.Row, wsMsg.Col)
 				case wsMsgTypeHeartbeat:
+					wsConn.WriteMessage(websocket.TextMessage, []byte("pong"))
 				default:
 					_, err = sshTerminal.Write([]byte(wsMsg.Cmd))
 				}
@@ -203,9 +203,9 @@ func (srv *Service) dealMsg(wsConn *websocket.Conn, sshTerminal *ssh.Terminal) {
 			default:
 				x, size, err := br.ReadRune()
 				if err != nil {
-					//cancel()
+					cancel()
 					srv.log.Error("读取终端消息出错", zap.Error(err))
-					//return
+					return
 					continue
 				}
 				if size > 0 {

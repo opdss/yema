@@ -33,14 +33,14 @@
   import { BasicTable, useTable, TableAction } from '/@/components/Table';
   import { columns, searchFormSchema } from './data';
   import { useMessage } from '/@/hooks/web/useMessage';
-  import {getProjectListByPage, deleteProject} from "/@/api/project"
+  import { getProjectListByPage, deleteProject } from '/@/api/project';
   import { useGo } from '/@/hooks/web/usePage';
 
   export default defineComponent({
     name: 'ProjectManagement',
     components: { BasicTable, TableAction },
     setup() {
-      const go = useGo()
+      const go = useGo();
       const { createMessage } = useMessage();
       const [registerTable, { reload }] = useTable({
         title: '项目管理',
@@ -59,23 +59,23 @@
           title: '操作',
           dataIndex: 'action',
           // slots: { customRender: 'action' },
-          fixed: "right",
+          fixed: 'right',
         },
       });
 
       function handleCreate() {
-       go("/project/create")
+        go('/project/create');
       }
 
       function handleEdit(record: Recordable) {
-        go(`/project/update/${record.id}`)
+        go(`/project/update/${record.id}`);
       }
 
       function handleDelete(record: Recordable) {
-        deleteProject(record.id).then(()=>{
-          createMessage.success("删除成功")
-          reload()
-        })
+        deleteProject(record.id).then(() => {
+          createMessage.success('删除成功');
+          reload();
+        });
       }
 
       function handleSuccess() {

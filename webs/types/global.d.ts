@@ -1,6 +1,6 @@
 import type {
-  ComponentRenderProxy,
-  VNode,
+  //ComponentRenderProxy,
+  //VNode,
   VNodeChild,
   ComponentPublicInstance,
   FunctionalComponent,
@@ -23,57 +23,57 @@ declare global {
   // }
 
   // vue
-  declare type PropType<T> = VuePropType<T>;
-  declare type VueNode = VNodeChild | JSX.Element;
+  type PropType<T> = VuePropType<T>;
+  type VueNode = VNodeChild | JSX.Element;
 
   export type Writable<T> = {
     -readonly [P in keyof T]: T[P];
   };
 
-  declare type Nullable<T> = T | null;
-  declare type NonNullable<T> = T extends null | undefined ? never : T;
-  declare type Recordable<T = any> = Record<string, T>;
-  declare type ReadonlyRecordable<T = any> = {
+  type Nullable<T> = T | null;
+  type NonNullables<T> = T extends null | undefined ? never : T;
+  type Recordable<T = any> = Record<string, T>;
+  type ReadonlyRecordable<T = any> = {
     readonly [key: string]: T;
   };
-  declare type Indexable<T = any> = {
+  type Indexable<T = any> = {
     [key: string]: T;
   };
-  declare type DeepPartial<T> = {
+  type DeepPartial<T> = {
     [P in keyof T]?: DeepPartial<T[P]>;
   };
-  declare type TimeoutHandle = ReturnType<typeof setTimeout>;
-  declare type IntervalHandle = ReturnType<typeof setInterval>;
+  type TimeoutHandle = ReturnType<typeof setTimeout>;
+  type IntervalHandle = ReturnType<typeof setInterval>;
 
-  declare interface ChangeEvent extends Event {
+  interface ChangeEvent extends Event {
     target: HTMLInputElement;
   }
 
-  declare interface WheelEvent {
+  interface WheelEvent {
     path?: EventTarget[];
   }
   interface ImportMetaEnv extends ViteEnv {
     __: unknown;
   }
 
-  declare interface ViteEnv {
+  interface ViteEnv {
     VITE_USE_MOCK: boolean;
     VITE_PUBLIC_PATH: string;
     VITE_GLOB_APP_TITLE: string;
     VITE_BUILD_COMPRESS: 'gzip' | 'brotli' | 'none';
   }
 
-  declare function parseInt(s: string | number, radix?: number): number;
+  function parseInt(s: string | number, radix?: number): number;
 
-  declare function parseFloat(string: string | number): number;
+  function parseFloat(string: string | number): number;
 
   namespace JSX {
     // tslint:disable no-empty-interface
-    type Element = VNode;
+    //type Element = VNode;
     // tslint:disable no-empty-interface
-    type ElementClass = ComponentRenderProxy;
+    //type ElementClass = ComponentRenderProxy;
     interface ElementAttributesProperty {
-      $props: any;
+      $props: {};
     }
     interface IntrinsicElements {
       [elem: string]: any;

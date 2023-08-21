@@ -1,7 +1,6 @@
 import { ErrorTypeEnum } from '/@/enums/exceptionEnum';
 import { MenuModeEnum, MenuTypeEnum } from '/@/enums/menuEnum';
-import { RoleInfo } from '/@/api/sys/model/userModel';
-import { SpaceInfo } from '/@/api/user/model';
+import { RoleInfo, SpaceInfo } from '/@/api/login/model';
 
 // Lock screen information
 export interface LockInfo {
