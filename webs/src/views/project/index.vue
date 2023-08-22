@@ -22,26 +22,31 @@
                 },
               },
             ]"
+            :dropDownActions="dropDownActions(record)"
           />
         </template>
       </template>
     </BasicTable>
+    <ModalDetection @register="registerModalDetection" @success="handleSuccess" />
   </div>
 </template>
 <script lang="ts">
   import { defineComponent } from 'vue';
   import { BasicTable, useTable, TableAction } from '/@/components/Table';
+  import { useModal } from '/@/components/Modal';
   import { columns, searchFormSchema } from './data';
   import { useMessage } from '/@/hooks/web/useMessage';
   import { getProjectListByPage, deleteProject } from '/@/api/project';
+  import ModalDetection from './ModalDetection.vue';
   import { useGo } from '/@/hooks/web/usePage';
 
   export default defineComponent({
     name: 'ProjectManagement',
-    components: { BasicTable, TableAction },
+    components: { BasicTable, TableAction, ModalDetection },
     setup() {
       const go = useGo();
       const { createMessage } = useMessage();
+      const [registerModalDetection, { openModal: openModalDetection }] = useModal();
       const [registerTable, { reload }] = useTable({
         title: '项目管理',
         api: getProjectListByPage,
@@ -55,7 +60,7 @@
         bordered: true,
         showIndexColumn: false,
         actionColumn: {
-          width: 80,
+          width: 120,
           title: '操作',
           dataIndex: 'action',
           // slots: { customRender: 'action' },
@@ -82,12 +87,28 @@
         reload();
       }
 
+      function handleCheck(record: Recordable) {
+        openModalDetection(true, record);
+      }
+
+      function dropDownActions(record: Recordable): ActionItem[] {
+        return [
+          {
+            icon: 'ant-design:check-square-outlined',
+            label: '检测',
+            onClick: handleCheck.bind(null, record),
+          },
+        ];
+      }
+
       return {
         registerTable,
         handleCreate,
         handleEdit,
         handleDelete,
         handleSuccess,
+        dropDownActions,
+        registerModalDetection,
       };
     },
   });

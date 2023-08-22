@@ -14,7 +14,14 @@
     </div>
   </div>
 </template>
-<script lang="ts"></script>
+<script lang="ts">
+
+
+ export default {
+   name: 'ServerTerminal',
+ };
+
+</script>
 
 <script lang="ts" setup>
   import { ref, onMounted, watchEffect, onBeforeUnmount } from 'vue';

@@ -92,21 +92,14 @@ func (srv *Service) Create(params *CreateReq) error {
 // Detail 上线单详情
 func (srv *Service) Detail(spaceAndId *common.SpaceWithId) (taskDetail *model.Task, err error) {
 	taskDetail = &model.Task{}
-	//err = srv.db.Where(spaceAndId).
-	//	Preload("Project").
-	//	First(&taskDetail).
-	//	Error
-	//if err != nil {
-	//	return
-	//}
-	//if len(taskDetail.ServerIds) > 0 {
-	//	servers := make([]*model.Server, 0)
-	//	err = srv.db.Where("id in ?", []int64(taskDetail.ServerIds)).Find(&servers).Error
-	//	if err != nil {
-	//		return
-	//	}
-	//	taskDetail.Servers = servers
-	//}
+	err = srv.db.Where(spaceAndId).
+		Preload("Project").
+		Preload("Servers").
+		First(&taskDetail).
+		Error
+	if err != nil {
+		return
+	}
 	return
 }
 

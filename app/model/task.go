@@ -36,9 +36,9 @@ type Task struct {
 	CreatedAt time.Time `gorm:"column:created_at;type:time;notNull" json:"created_at"`
 	UpdatedAt time.Time `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
 
-	Project     Project     `json:"project"`
-	User        User        `json:"user"`
-	Space       Space       `json:"space"`
-	Environment Environment `json:"environment"`
-	Servers     []*Server   `gorm:"-" json:"servers"`
+	Project     *Project     `json:"project,omitempty"`
+	User        *User        `json:"user,omitempty"`
+	Space       *Space       `json:"space,omitempty"`
+	Environment *Environment `json:"environment,omitempty"`
+	Servers     []*Server    `gorm:"many2many:task_server" json:"servers,omitempty"`
 }

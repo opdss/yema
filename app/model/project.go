@@ -50,7 +50,7 @@ type Project struct {
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"-"`
 
-	Space       Space       `json:"space"`
-	Environment Environment `json:"environment"`
-	Servers     []Server    `gorm:"many2many:project_server" json:"servers"`
+	Space       *Space       `json:"space,omitempty"`
+	Environment *Environment `json:"environment,omitempty"`
+	Servers     []Server     `gorm:"many2many:project_server" json:"servers,omitempty"`
 }
