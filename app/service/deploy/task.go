@@ -26,6 +26,7 @@ import (
 var ErrStopDeploy = Error.New("终止发布任务")
 
 var localSshSym string
+var localServerId = int64(0)
 var currentUser *user.User
 var currentHost string
 
@@ -83,9 +84,7 @@ type Task struct {
 	model          *model.Task
 	ReleaseTimeout time.Duration
 
-	started bool
-	stopped bool
-
+	started    bool
 	deployDirs *deployDirs
 
 	ctx    context.Context
@@ -93,21 +92,22 @@ type Task struct {
 
 	doneError chan error
 
-	taskLogs map[string]*TaskLog
+	taskLogs map[int64]*TaskLog
 }
 
 func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger) (*Task, error) {
-	taskLogs := make(map[string]*TaskLog)
+	taskLogs := make(map[int64]*TaskLog)
 	for i := range taskModel.Servers {
-		taskLogs[taskModel.Servers[i].Hostname()] = &TaskLog{}
+		taskLogs[taskModel.Servers[i].ID] = &TaskLog{}
 	}
-	taskLogs[localSshSym] = &TaskLog{}
+	taskLogs[localServerId] = &TaskLog{}
 	return &Task{
 		db:  db,
 		log: log,
 
-		model:    taskModel,
-		taskLogs: taskLogs,
+		doneError: make(chan error),
+		model:     taskModel,
+		taskLogs:  taskLogs,
 	}, nil
 }
 
@@ -370,15 +370,15 @@ func (t *Task) Stop() error {
 }
 
 type Msg struct {
-	Server string `json:"server"`
-	Data   []byte `json:"data"`
+	ServerId int64  `json:"server_id"`
+	Data     []byte `json:"data"`
 }
 
 func (t *Task) Output(ctx context.Context) <-chan Msg {
 	msg := make(chan Msg, len(t.model.Servers))
 	go func() {
 		defer close(msg)
-		offsetMap := make(map[string]int)
+		offsetMap := make(map[int64]int)
 		for k, _ := range t.taskLogs {
 			offsetMap[k] = 0
 		}
@@ -393,8 +393,8 @@ func (t *Task) Output(ctx context.Context) <-chan Msg {
 				n, err := t.taskLogs[k].ReadAt(_data, off)
 				if n > 0 {
 					msg <- Msg{
-						Server: k,
-						Data:   _data,
+						ServerId: k,
+						Data:     _data,
 					}
 				}
 				if errors.Is(err, io.EOF) {
@@ -470,11 +470,13 @@ func (t *Task) getRepo() (repo.Repo, error) {
 }
 
 func (t *Task) newRecordLocal(cmd string, envs *ssh.Envs) *Record {
-	return NewRecordLocal(t.db, t.log, t.model.ID, t.userId, cmd, envs, t.taskLogs[localSshSym])
+	t.taskLogs[localServerId].Write([]byte(localSshSym))
+	return NewRecordLocal(t.db, t.log, t.model.ID, t.userId, cmd, envs, t.taskLogs[localServerId])
 }
 
 func (t *Task) newRecordRemote(cmd string, server *model.Server, envs *ssh.Envs) *Record {
-	return NewRecordRemote(t.db, t.log, t.model.ID, t.userId, cmd, server, envs, t.taskLogs[server.Hostname()])
+	t.taskLogs[server.ID].Write([]byte(server.Hostname()))
+	return NewRecordRemote(t.db, t.log, t.model.ID, t.userId, cmd, server, envs, t.taskLogs[server.ID])
 }
 
 func (t *Task) createReleaseVersion() string {
