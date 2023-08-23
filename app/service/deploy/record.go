@@ -33,13 +33,12 @@ func (w *writer) Bytes() []byte {
 }
 
 type Record struct {
-	db      *gorm.DB
-	log     *zap.Logger
-	model   *model.Record
-	server  *model.Server
-	envs    *ssh.Envs
-	writer  io.Writer
-	_writer *writer
+	db     *gorm.DB
+	log    *zap.Logger
+	model  *model.Record
+	server *model.Server
+	envs   *ssh.Envs
+	writer io.Writer
 }
 
 func NewRecordLocal(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd string, envs *ssh.Envs, releaseWriter io.Writer) *Record {
@@ -69,7 +68,7 @@ func NewRecordRemote(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd str
 			Status:   -1,
 			Envs:     envs.SliceKV(),
 		},
-		writer: releaseWriter,
+		writer: &writer{buf: bytes.Buffer{}, w: releaseWriter},
 
 		db:  db,
 		log: log,
@@ -79,20 +78,15 @@ func NewRecordRemote(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd str
 func (r *Record) Run(ctx context.Context) (err error) {
 	startT := time.Now()
 	var command ssh.Command
-	var wr *writer
 	if r.server == nil {
-		r.writer.Write([]byte("wuxin@localhost $\n"))
-		wr = &writer{buf: bytes.Buffer{}, w: r.writer}
-		command = ssh.NewLocalExec(wr)
+		command = ssh.NewLocalExec(r.writer)
 	} else {
-		r.writer.Write([]byte("wuxin@localhost $\n"))
-		wr = &writer{buf: bytes.Buffer{}, w: r.writer}
 		command, err = global.Ssh.NewRemoteExec(ssh.ServerConfig{
 			Host:     r.server.Host,
 			User:     r.server.User,
 			Password: "",
 			Port:     r.server.Port,
-		}, wr)
+		}, r.writer)
 	}
 	if err == nil {
 		err = command.WithEnvs(r.envs).WithCtx(ctx).Run(r.model.Command)
@@ -108,8 +102,7 @@ func (r *Record) Run(ctx context.Context) (err error) {
 	} else {
 		r.model.Status = 0
 	}
-	r._writer = wr
-	r.model.RunTime = time.Since(startT).Milliseconds()
+	r.model.RunTime = time.Now().Sub(startT).Milliseconds()
 	return r.save()
 }
 
@@ -121,10 +114,7 @@ func (r *Record) Save(status int, output *string, runtime int64) error {
 }
 
 func (r *Record) Output() string {
-	if r._writer == nil {
-		return ""
-	}
-	return string(r._writer.buf.Bytes())
+	return string(r.writer.(*writer).Bytes())
 }
 
 func (r *Record) save() error {
