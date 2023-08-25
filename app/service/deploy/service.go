@@ -226,8 +226,8 @@ func (srv *Service) getDbRecord(ctx context.Context, taskId int64) (_ <-chan Msg
 
 			}
 			msg <- Msg{
-				Server: v.Server.Hostname(),
-				Data:   []byte(v.Output),
+				ServerId: v.Server.ID,
+				Data:     []byte(v.Output),
 			}
 		}
 	}()
