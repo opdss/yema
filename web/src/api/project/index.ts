@@ -17,6 +17,7 @@ enum Api {
   ProjectBranches = '/project/{id}/branches',
   ProjectTags = '/project/{id}/tags',
   ProjectCommits = '/project/{id}/commits',
+  ProjectDetection = "ws://"+window.location.host+"/api/server/{id}/terminal",
 }
 
 export const getProjectListByPage = (params?: ListReq) =>

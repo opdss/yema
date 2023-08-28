@@ -5,11 +5,12 @@ import {
   ListItemRes, SetLogin,
 } from './model';
 import { defHttp } from '/@/utils/http/axios';
+import {getWebsocketApiUrl} from '/@/utils/common'
 
 enum Api {
   Server = '/server',
   ServerId = '/server/{id}',
-  ServerSshWs = 'ws://localhost:8989/api/server/{id}/terminal',
+  ServerSshWs = getWebsocketApiUrl('/server/{id}/terminal'),
   ServerCheck =  "/server/{id}/check",
   ServerSetLogin =  "/server/set_authorized",
 }
@@ -30,7 +31,7 @@ export const deleteServer = (id: number) =>
 export const checkServer = (id: number) =>
   defHttp.post({ url: Api.ServerCheck.replace('{id}', id.toString()) }, {errorMessageMode:"none"});
 
-export const setLoginServer = (params:SetLogin) =>
+export const setLoginServer = (params: SetLogin) =>
   defHttp.post({ url: Api.ServerSetLogin, params: params}, {errorMessageMode:"none"});
 
 export const getServerSshWs = (id: number) =>
