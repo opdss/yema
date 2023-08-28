@@ -33,8 +33,8 @@ type Task struct {
 	LastError   string              `gorm:"column:last_error;type:string;notNull;default:'';comment:最后错误" json:"last_error"`
 	AuditUserId int64               `gorm:"column:audit_user_id;notNull;default:0;审核员" json:"audit_user_id"`
 
-	CreatedAt time.Time `gorm:"column:created_at;type:time;notNull" json:"created_at"`
-	UpdatedAt time.Time `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
+	CreatedAt time.Time `gorm:"column:created_at;type:datetime;notNull" json:"created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at;type:datetime;notNull" json:"updated_at"`
 
 	Project     *Project     `json:"project,omitempty"`
 	User        *User        `json:"user,omitempty"`

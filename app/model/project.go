@@ -46,8 +46,8 @@ type Project struct {
 
 	Status field.Status `gorm:"column:status;size:1;notNull;default:0;comment:状态" json:"status"`
 
-	CreatedAt time.Time      `gorm:"column:created_at;type:time;notNull" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
+	CreatedAt time.Time      `gorm:"column:created_at;type:datetime;notNull" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime;notNull" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"-"`
 
 	Space       *Space       `json:"space,omitempty"`

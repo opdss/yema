@@ -10,8 +10,8 @@ type Member struct {
 	SpaceId int64  `gorm:"column:space_id;notNull;uniqueIndex:space_user;comment:空间" json:"space_id"`
 	Role    string `gorm:"column:role;size:20;notNull;comment:角色" json:"role"`
 
-	CreatedAt time.Time `gorm:"column:created_at;type:time;notNull" json:"created_at"`
-	UpdatedAt time.Time `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
+	CreatedAt time.Time `gorm:"column:created_at;type:datetime;notNull" json:"created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at;type:datetime;notNull" json:"updated_at"`
 
 	Space Space
 	User  User

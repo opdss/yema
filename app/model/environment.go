@@ -14,8 +14,8 @@ type Environment struct {
 	Description string       `gorm:"column:description;type:string;size:500;notNull;default:'';comment:简介说明" json:"description"`
 	Color       string       `gorm:"column:color;size:10;notNull;default:'';comment:主题色" json:"color"`
 
-	CreatedAt time.Time      `gorm:"column:created_at;type:time;notNull" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at;type:time;notNull" json:"updated_at"`
+	CreatedAt time.Time      `gorm:"column:created_at;type:datetime;notNull" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime;notNull" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"-"`
 
 	Space    Space      `json:"space"`
