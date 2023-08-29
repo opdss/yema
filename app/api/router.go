@@ -130,14 +130,14 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 
 	//项目管理
 	{
-		ctl := &ProjectCtl{service: project.NewService(global.DB, global.Ssh, global.Repo)}
+		ctl := &ProjectCtl{service: project.NewService(global.Log, global.DB, global.Ssh, global.Repo, 0)}
 		masterPermRouter.GET("/project", ctl.List)
 		masterPermRouter.POST("/project", ctl.Create)
 		masterPermRouter.DELETE("/project/:id", ctl.Delete)
 		masterPermRouter.GET("/project/:id", ctl.Detail)
 		masterPermRouter.PUT("/project", ctl.Update)
 		masterPermRouter.GET("/project/options", ctl.Options)
-		//项目检测
+		//项目检测 websocket
 		masterPermRouter.GET("/project/:id/detection", ctl.Detection)
 		masterPermRouter.GET("/project/:id/branches", ctl.Branches)
 		masterPermRouter.GET("/project/:id/tags", ctl.Tags)

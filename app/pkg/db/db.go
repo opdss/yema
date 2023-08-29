@@ -17,10 +17,11 @@ const Sqlite3 = "sqlite3"
 var ErrDB = errs.Class("DB")
 
 type Config struct {
-	Driver string `help:"数据库驱动" default:"mysql"`
+	Driver string `help:"数据库驱动" default:"sqlite3"`
+	//Dsn string `help:"数据库连接"  default:"ljg:abcd123456@tcp(192.168.43.90:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"`
 	//Dsn string `help:"数据库连接"  default:"host=myhost port=myport user=gorm dbname=gorm password=mypassword"`
 	//Dsn string `help:"数据库连接"  default:"/tmp/gorm.db"`
-	Dsn      string `help:"数据库连接"  devDefault:"ljg:abcd123456@tcp(101.37.33.124:10009)/test?charset=utf8mb4&parseTime=True&loc=Local" default:"ljg:abcd123456@tcp(192.168.43.90:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"`
+	Dsn      string `help:"数据库连接"  default:"/Users/wuxin/worker/yema.dev/yema_dev.db"`
 	LogLevel string `help:"数据库日志打印级别,默认为空,可选[error|warn|info]" devDefault:"" default:"warn"`
 }
 

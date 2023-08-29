@@ -90,6 +90,7 @@ export type CommitItems = TagItems & {
 };
 
 export interface DetectionInfoItem {
+  server_id: number;
   title: string;
   error: string;
   todo: string;

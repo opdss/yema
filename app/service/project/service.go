@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/zeebo/errs"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 	"yema.dev/app/model"
 	"yema.dev/app/model/field"
 	"yema.dev/app/pkg/repo"
@@ -16,22 +19,31 @@ import (
 )
 
 var (
+	Error       = errs.Class("Service.Project")
 	service     *Service
 	onceService sync.Once
 )
 
 type Service struct {
+	log  *zap.Logger
 	db   *gorm.DB
 	ssh  *ssh.Ssh
 	repo *repo.Repos
+
+	detectionTimeout time.Duration //检测项目时的超时时间
 }
 
-func NewService(db *gorm.DB, ssh *ssh.Ssh, repo *repo.Repos) *Service {
+func NewService(log *zap.Logger, db *gorm.DB, ssh *ssh.Ssh, repo *repo.Repos, detectionTimeout time.Duration) *Service {
+	if detectionTimeout == 0 {
+		detectionTimeout = time.Second * 600
+	}
 	onceService.Do(func() {
 		service = &Service{
-			db:   db,
-			ssh:  ssh,
-			repo: repo,
+			log:              log,
+			db:               db,
+			ssh:              ssh,
+			repo:             repo,
+			detectionTimeout: detectionTimeout,
 		}
 	})
 	return service

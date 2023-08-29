@@ -3,7 +3,9 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/wuzfei/go-helper/slices"
+	"go.uber.org/zap"
 	ctx2 "yema.dev/app/api/ctx"
+	"yema.dev/app/global"
 	"yema.dev/app/internal/errcode"
 	"yema.dev/app/internal/response"
 	"yema.dev/app/model"
@@ -86,15 +88,24 @@ func (ctl *ProjectCtl) Options(ctx *gin.Context) {
 	response.Success(ctx, res)
 }
 
-// Detection 检测项目
+// Detection 检测项目, websocket连接
 func (ctl *ProjectCtl) Detection(ctx *gin.Context) {
 	spaceAndId, err := ctx2.GetSpaceWithId(ctx)
 	if err != nil {
 		response.Fail(ctx, errcode.ErrInvalidParams.Wrap(err))
 		return
 	}
-	res, err := ctl.service.Detection(spaceAndId)
-	response.Response(ctx, err, res)
+
+	wsConn, err := ctx2.UpGrader(ctx)
+	if err != nil {
+		response.Fail(ctx, errcode.ErrServer.Wrap(err))
+	}
+	defer func() {
+		_ = wsConn.Close()
+	}()
+	if err = ctl.service.DetectionWs(wsConn, spaceAndId); err != nil {
+		global.Log.Error("DetectionWs return error", zap.Error(err))
+	}
 }
 
 // Branches 分支列表

@@ -7,10 +7,10 @@ import {
   TagItems,
   CommitItems,
   Detail,
-  DetectionInfoItem,
 } from './model';
 import { defHttp } from '/@/utils/http/axios';
 import { GetOptionItemsModel } from '../baseModel';
+import { getWebsocketApiUrl } from '/@/utils/common';
 
 enum Api {
   Project = '/project',
@@ -34,11 +34,14 @@ export const updateProject = (params: UpdateReq) =>
 export const deleteProject = (id: number) =>
   defHttp.delete({ url: Api.ProjectId.replace('{id}', id.toString()) });
 
-export const detailProject = (id: number) =>
-  defHttp.get<Detail>({ url: Api.ProjectId.replace('{id}', id.toString()) });
+export const detailProject = (id: number, notAlertErrMsg: boolean | undefined) =>
+  defHttp.get<Detail>(
+    { url: Api.ProjectId.replace('{id}', id.toString()) },
+    notAlertErrMsg ? { errorMessageMode: 'none' } : {},
+  );
 
-export const detectionProject = (id: number) =>
-  defHttp.get<DetectionInfoItem[]>({ url: Api.ProjectId.replace('{id}', id.toString()) });
+export const detectionProjectWs = (id: number) =>
+  getWebsocketApiUrl(Api.ProjectDetection).replace('{id}', id.toString());
 
 export const getProjectOptions = (params?: ListReq) =>
   defHttp.get<GetOptionItemsModel>({ url: Api.ProjectOptions, params });

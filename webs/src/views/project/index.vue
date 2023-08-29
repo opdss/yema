@@ -21,13 +21,15 @@
                   confirm: handleDelete.bind(null, record),
                 },
               },
+              {
+                icon: 'ant-design:exclamation-circle-outlined',
+                onClick: handleDetail.bind(null, record),
+              },
             ]"
-            :dropDownActions="dropDownActions(record)"
           />
         </template>
       </template>
     </BasicTable>
-    <ModalDetection @register="registerModalDetection" @success="handleSuccess" />
   </div>
 </template>
 <script lang="ts">
@@ -37,16 +39,14 @@
   import { columns, searchFormSchema } from './data';
   import { useMessage } from '/@/hooks/web/useMessage';
   import { getProjectListByPage, deleteProject } from '/@/api/project';
-  import ModalDetection from './ModalDetection.vue';
   import { useGo } from '/@/hooks/web/usePage';
 
   export default defineComponent({
     name: 'ProjectManagement',
-    components: { BasicTable, TableAction, ModalDetection },
+    components: { BasicTable, TableAction },
     setup() {
       const go = useGo();
       const { createMessage } = useMessage();
-      const [registerModalDetection, { openModal: openModalDetection }] = useModal();
       const [registerTable, { reload }] = useTable({
         title: '项目管理',
         api: getProjectListByPage,
@@ -88,17 +88,11 @@
       }
 
       function handleCheck(record: Recordable) {
-        openModalDetection(true, record);
+        go(`/project/detection/${record.id}`);
       }
 
-      function dropDownActions(record: Recordable): ActionItem[] {
-        return [
-          {
-            icon: 'ant-design:check-square-outlined',
-            label: '检测',
-            onClick: handleCheck.bind(null, record),
-          },
-        ];
+      function handleDetail(record: Recordable) {
+        go(`/project/detail/${record.id}`);
       }
 
       return {
@@ -107,8 +101,7 @@
         handleEdit,
         handleDelete,
         handleSuccess,
-        dropDownActions,
-        registerModalDetection,
+        handleDetail,
       };
     },
   });

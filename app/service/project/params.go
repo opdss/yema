@@ -1,6 +1,8 @@
 package project
 
-import "yema.dev/app/pkg/db"
+import (
+	"yema.dev/app/pkg/db"
+)
 
 type CreateReq struct {
 	SpaceId       int64  `json:"-" binding:"required,gt=0"`
@@ -74,7 +76,8 @@ type ListReq struct {
 }
 
 type DetectionMsg struct {
-	Title string `json:"title"`
-	Error string `json:"error"`
-	Todo  string `json:"todo"`
+	ServerId int64  `json:"server_id"`
+	Title    string `json:"title"`
+	Error    string `json:"error"`
+	Todo     string `json:"todo"`
 }

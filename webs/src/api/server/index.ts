@@ -1,10 +1,11 @@
 import { ListReq, CreateReq, UpdateReq, ListItemRes, SetLogin } from './model';
 import { defHttp } from '/@/utils/http/axios';
+import { getWebsocketApiUrl } from '/@/utils/common';
 
 enum Api {
   Server = '/server',
   ServerId = '/server/{id}',
-  ServerSshWs = 'ws://localhost:8989/api/server/{id}/terminal',
+  ServerTerminal = '/server/{id}/terminal',
   ServerCheck = '/server/{id}/check',
   ServerSetLogin = '/server/set_authorized',
 }
@@ -29,4 +30,5 @@ export const checkServer = (id: number) =>
 export const setLoginServer = (params: SetLogin) =>
   defHttp.post({ url: Api.ServerSetLogin, params: params }, { errorMessageMode: 'none' });
 
-export const getServerSshWs = (id: number) => Api.ServerSshWs.replace('{id}', id.toString());
+export const getServerSshWs = (id: number) =>
+  getWebsocketApiUrl(Api.ServerTerminal).replace('{id}', id.toString());

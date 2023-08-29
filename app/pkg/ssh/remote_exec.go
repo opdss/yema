@@ -40,11 +40,10 @@ func (e *RemoteExec) Run(cmd string) error {
 			closed = true
 		}
 	}()
-	e.client.add()
-	defer e.client.done()
 	if !e.envs.Empty() {
 		cmd = fmt.Sprintf("%s && %s", strings.Join(e.envs.SliceKV(), " "), cmd)
 	}
+
 	if e.output != nil {
 		sess.Stdout = e.output
 		sess.Stderr = e.output
