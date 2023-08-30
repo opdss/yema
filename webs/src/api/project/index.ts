@@ -40,7 +40,7 @@ export const detailProject = (id: number, notAlertErrMsg: boolean | undefined) =
     notAlertErrMsg ? { errorMessageMode: 'none' } : {},
   );
 
-export const detectionProjectWs = (id: number) =>
+export const getDetectionProjectWs = (id: number) =>
   getWebsocketApiUrl(Api.ProjectDetection).replace('{id}', id.toString());
 
 export const getProjectOptions = (params?: ListReq) =>

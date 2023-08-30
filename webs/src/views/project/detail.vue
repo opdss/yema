@@ -2,7 +2,7 @@
   <PageWrapper :class="prefixCls" v-loading="loadingRef" title="项目详情" contentBackground>
     <template #extra>
       <a-button> 返回 </a-button>
-      <a-button type="primary"> 配置检测 </a-button>
+      <a-button type="primary" @click="openDetection"> 配置检测 </a-button>
     </template>
 
     <a-card title="基本信息" :bordered="false" class="mt-5">
@@ -102,6 +102,7 @@
         </a-descriptions-item>
       </a-descriptions>
     </a-card>
+    <ModalDetection @register="register" :projectDetail="projectDetail" />
   </PageWrapper>
 </template>
 <script lang="ts" setup>
@@ -123,9 +124,12 @@
   import { detailProject } from '/@/api/project';
   import { useRoute } from 'vue-router';
   import { useMessage } from '/@/hooks/web/useMessage';
+  import { useModal } from '/@/components/Modal';
+  import ModalDetection from './ModalDetection.vue';
 
   const route = useRoute();
   const { createMessage } = useMessage();
+  const [register, { openModal: openDetection }] = useModal();
 
   const projectId = parseInt(route.params?.id as unknown as string);
   const loadingRef = ref(false);
