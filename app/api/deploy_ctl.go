@@ -79,7 +79,7 @@ func (ctl *DeployCtl) StopRelease(ctx *gin.Context) {
 		response.Fail(ctx, errcode.ErrInvalidParams.Wrap(err))
 		return
 	}
-	err = ctl.service.Release(spaceAndId, ctx2.UserId(ctx))
+	err = ctl.service.StopRelease(spaceAndId)
 	response.Response(ctx, err, nil)
 }
 

@@ -6,15 +6,17 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 // client ssh方便复用tcp连接管理
 type client struct {
 	mux          sync.Mutex
-	sh           *Ssh
 	serverConfig *ServerConfig
 	client       *ssh.Client
-	ref          int
+	ref          *int32
+
+	closeFn func()
 }
 
 func (s *client) Key() string {
@@ -22,26 +24,33 @@ func (s *client) Key() string {
 }
 
 func (s *client) add() {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	s.ref++
+	atomic.AddInt32(s.ref, 1)
 }
 
 func (s *client) done() {
+	atomic.AddInt32(s.ref, -1)
+}
+func (s *client) Ref() int32 {
+	return atomic.LoadInt32(s.ref)
+}
+
+func (s *client) Done() {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.ref--
-	if s.ref == 0 {
-		_ = s.client.Close()
-		s.sh.removeClient(s.serverConfig)
+	n := atomic.AddInt32(s.ref, -1)
+	if n == 0 {
+		if s.closeFn != nil {
+			s.closeFn()
+		}
+		s.client.Close()
 	}
 }
 
-func newSshClient(sh *Ssh, conf *ServerConfig) (_ *client, err error) {
+func NewClient(conf *ServerConfig, closeFn func()) (_ *client, err error) {
 	config := &ssh.ClientConfig{
 		User:            conf.User,
-		Auth:            []ssh.AuthMethod{ssh.Password(conf.Password), ssh.PublicKeysCallback(sh.IdentitySigners)},
-		Timeout:         sh.config.Timeout,
+		Auth:            []ssh.AuthMethod{ssh.Password(conf.Password), ssh.PublicKeys(conf.IdentitySigner)},
+		Timeout:         conf.Timeout,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	config.SetDefaults()
@@ -50,27 +59,36 @@ func newSshClient(sh *Ssh, conf *ServerConfig) (_ *client, err error) {
 	if nil != err {
 		return nil, err
 	}
+	var ref int32
 	return &client{
 		serverConfig: conf,
 		client:       sshClient,
-		sh:           sh,
+		ref:          &ref,
+
+		closeFn: closeFn,
 	}, nil
 }
 
+// RunCmd 执行命令
 func (s *client) RunCmd(cmd string) (output []byte, err error) {
+	s.mux.Lock()
 	var session *ssh.Session
 	session, err = s.client.NewSession()
 	if err != nil {
+		s.mux.Unlock()
 		return nil, err
 	}
 	s.add()
+	s.mux.Unlock()
 	output, err = session.CombinedOutput(cmd)
 	_ = session.Close()
-	s.done()
+	s.Done()
 	return
 }
 
-func (s *client) newTerminal(cols, rows int) (term *Terminal, err error) {
+func (s *client) NewTerminal(cols, rows int) (term *Terminal, err error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	session, err := s.client.NewSession()
 	if err != nil {
 		return nil, err
@@ -115,7 +133,9 @@ func (s *client) newTerminal(cols, rows int) (term *Terminal, err error) {
 	return term, nil
 }
 
-func (s *client) newSftp() (*Sftp, error) {
+func (s *client) NewSftp() (*Sftp, error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	scp, err := sftp.NewClient(s.client)
 	if err != nil {
 		return nil, err
@@ -128,11 +148,12 @@ func (s *client) newSftp() (*Sftp, error) {
 	return _sftp, nil
 }
 
-func (s *client) newRemoteExec(output io.Writer) (*RemoteExec, error) {
+func (s *client) NewRemoteExec(output io.Writer) (*RemoteExec, error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	_re := &RemoteExec{
 		output: output,
 		client: s,
-		envs:   NewEnvs(),
 	}
 	s.add()
 	return _re, nil

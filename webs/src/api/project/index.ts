@@ -41,7 +41,7 @@ export const detailProject = (id: number, notAlertErrMsg: boolean | undefined) =
   );
 
 export const getDetectionProjectWs = (id: number) =>
-  getWebsocketApiUrl(Api.ProjectDetection).replace('{id}', id.toString());
+  getWebsocketApiUrl(Api.ProjectDetection).replace('{id}', id ? id.toString() : '0');
 
 export const getProjectOptions = (params?: ListReq) =>
   defHttp.get<GetOptionItemsModel>({ url: Api.ProjectOptions, params });

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"io"
 	"sync"
 )
@@ -14,6 +15,9 @@ type TaskLog struct {
 func (tl *TaskLog) Write(b []byte) (n int, err error) {
 	tl.mux.Lock()
 	defer tl.mux.Unlock()
+	if tl.isOver {
+		return 0, errors.New("关闭日志写入")
+	}
 	tl.buf = append(tl.buf, b...)
 	return len(b), nil
 }

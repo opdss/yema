@@ -7,21 +7,21 @@ import (
 )
 
 type Envs struct {
-	mux *sync.RWMutex
+	mux sync.RWMutex
 	kvs map[string]string
 }
 
 func NewEnvs() *Envs {
 	return &Envs{
 		kvs: make(map[string]string),
-		mux: &sync.RWMutex{},
+		mux: sync.RWMutex{},
 	}
 }
 
 func NewEnvsByMapStringAny(source map[string]any) *Envs {
 	res := &Envs{
 		kvs: make(map[string]string),
-		mux: &sync.RWMutex{},
+		mux: sync.RWMutex{},
 	}
 	for k, v := range source {
 		res.kvs[k] = fmt.Sprintf("%v", v)
@@ -32,7 +32,7 @@ func NewEnvsByMapStringAny(source map[string]any) *Envs {
 func NewEnvsBySliceKV(source []string) *Envs {
 	res := &Envs{
 		kvs: make(map[string]string),
-		mux: &sync.RWMutex{},
+		mux: sync.RWMutex{},
 	}
 	for _, v := range source {
 		r := strings.SplitN(v, "=", 2)
@@ -66,7 +66,7 @@ func (e *Envs) Pick(keys ...string) *Envs {
 	defer e.mux.RUnlock()
 	res := &Envs{
 		kvs: make(map[string]string),
-		mux: &sync.RWMutex{},
+		mux: sync.RWMutex{},
 	}
 	for _, k := range keys {
 		if v, ok := e.kvs[k]; ok {

@@ -71,7 +71,7 @@ func (srv *Service) SetAuthorized(params *SetAuthorizedReq) error {
 	if serverDetail.Status.IsEnable() {
 		return errors.New("该服务器能正常连接，无需设置")
 	}
-	signer, err := srv.ssh.IdentitySigner()
+	signer := srv.ssh.GetIdentitySigner()
 	if err != nil {
 		return err
 	}

@@ -5,91 +5,57 @@ import (
 	"github.com/zeebo/errs"
 	"golang.org/x/crypto/ssh"
 	"io"
-	"os"
 	"sync"
 	"time"
+	"yema.dev/app/utils"
 )
 
 var (
 	ErrSSH = errs.Class("ssh")
 )
 
-// Config ssh配置
-type Config struct {
-	IdentityFile     string        `help:"免密登陆密钥地址" default:"$HOME/.ssh/id_rsa"`
-	IdentityPassword string        `help:"免密登陆密钥密码" default:""`
-	Timeout          time.Duration `help:"连接超时" default:"30s"`
-}
-
 type Ssh struct {
-	config  *Config
-	mux     *sync.Mutex
+	mux     *sync.RWMutex
 	clients map[string]*client
+
+	identitySigner ssh.Signer
+	timeout        time.Duration
 }
 
 func NewSSH(conf *Config) (*Ssh, error) {
+	iSigner, err := conf.IdentitySigner()
+	if err != nil {
+		return nil, err
+	}
 	sh := &Ssh{
-		config:  conf,
-		mux:     &sync.Mutex{},
+		mux:     &sync.RWMutex{},
 		clients: make(map[string]*client),
+
+		identitySigner: iSigner,
+		timeout:        conf.Timeout,
 	}
 
-	//go func() {
-	//	tk := time.NewTicker(time.Second * 3)
-	//	defer tk.Stop()
-	//	for {
-	//		select {
-	//		case <-tk.C:
-	//			if len(sh.clients) == 0 {
-	//				fmt.Printf("当前clients:[0] \r\n")
-	//			} else {
-	//				for _, v := range sh.clients {
-	//					fmt.Printf("当前clients:[%s], sessions:[%d]\r\n", v.serverConfig.String(), v.ref)
-	//				}
-	//			}
-	//		}
-	//	}
-	//}()
+	if utils.IsDev() {
+		go func() {
+			tk := time.NewTicker(time.Second * 5)
+			defer tk.Stop()
+			for {
+				select {
+				case <-tk.C:
+					sh.mux.RLock()
+					if len(sh.clients) == 0 {
+						fmt.Printf("当前clients:[0] \r\n")
+					} else {
+						for _, v := range sh.clients {
+							fmt.Printf("当前clients:[%s], sessions:[%d]\r\n", v.serverConfig.String(), v.Ref())
+						}
+					}
+					sh.mux.RUnlock()
+				}
+			}
+		}()
+	}
 	return sh, nil
-}
-
-func (s *Ssh) IdentitySigners() (signers []ssh.Signer, err error) {
-	var sg ssh.Signer
-	sg, err = s.IdentitySigner()
-	if err == nil {
-		return []ssh.Signer{sg}, nil
-	}
-	return
-}
-
-func (s *Ssh) IdentitySigner() (signer ssh.Signer, err error) {
-	_, err = os.Stat(s.config.IdentityFile)
-	if err != nil {
-		return nil, ErrSSH.New("ssh config IdentityFile: %s not exists", s.config.IdentityFile)
-	}
-	bytes, err := os.ReadFile(s.config.IdentityFile)
-	if err != nil {
-		return nil, ErrSSH.Wrap(err)
-	}
-	signer, err = ssh.ParsePrivateKey(bytes)
-	if _, ok := err.(*ssh.PassphraseMissingError); ok {
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(bytes, []byte(s.config.IdentityPassword))
-	}
-	if err != nil {
-		err = ErrSSH.Wrap(err)
-	}
-	return
-}
-
-type ServerConfig struct {
-	Host     string `json:"host"`
-	User     string `json:"user"`
-	Password string `json:"password"` //如果密码为空，则认为是免密登陆
-	Port     int    `json:"port"`
-}
-
-func (s *ServerConfig) String() (key string) {
-	return fmt.Sprintf("%s:%s@%s:%d", s.User, s.Password, s.Host, s.Port)
 }
 
 func (s *Ssh) newClient(conf ServerConfig) (sc *client, err error) {
@@ -99,7 +65,18 @@ func (s *Ssh) newClient(conf ServerConfig) (sc *client, err error) {
 	if v, ok := s.clients[key]; ok {
 		return v, nil
 	}
-	sc, err = newSshClient(s, &conf)
+	if conf.Timeout == 0 {
+		conf.Timeout = s.timeout
+	}
+	conf.IdentitySigner = s.identitySigner
+	sc, err = NewClient(&conf, func() {
+		s.mux.Lock()
+		defer s.mux.Unlock()
+		key := conf.String()
+		if _, ok := s.clients[key]; ok {
+			delete(s.clients, key)
+		}
+	})
 	if err != nil {
 		return
 	}
@@ -108,8 +85,6 @@ func (s *Ssh) newClient(conf ServerConfig) (sc *client, err error) {
 }
 
 func (s *Ssh) removeClient(conf *ServerConfig) {
-	fmt.Println(s)
-	fmt.Println(s.mux)
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	key := conf.String()
@@ -125,7 +100,7 @@ func (s *Ssh) NewTerminal(conf ServerConfig, cols, rows int) (sess *Terminal, er
 		err = ErrSSH.Wrap(err)
 		return
 	}
-	return sshClient.newTerminal(cols, rows)
+	return sshClient.NewTerminal(cols, rows)
 }
 
 // RunCmd 直接连接执行命令
@@ -144,7 +119,7 @@ func (s *Ssh) NewSftp(conf ServerConfig) (*Sftp, error) {
 		err = ErrSSH.Wrap(err)
 		return nil, err
 	}
-	return sshClient.newSftp()
+	return sshClient.NewSftp()
 }
 
 func (s *Ssh) NewRemoteExec(conf ServerConfig, output io.Writer) (*RemoteExec, error) {
@@ -153,5 +128,9 @@ func (s *Ssh) NewRemoteExec(conf ServerConfig, output io.Writer) (*RemoteExec, e
 		err = ErrSSH.Wrap(err)
 		return nil, err
 	}
-	return sshClient.newRemoteExec(output)
+	return sshClient.NewRemoteExec(output)
+}
+
+func (s *Ssh) GetIdentitySigner() ssh.Signer {
+	return s.identitySigner
 }

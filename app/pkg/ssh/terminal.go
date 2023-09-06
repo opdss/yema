@@ -7,7 +7,6 @@ import (
 
 // Terminal  模拟终端会话
 type Terminal struct {
-	sid     string
 	client  *client
 	session *ssh.Session
 	reader  io.Reader
@@ -17,7 +16,7 @@ type Terminal struct {
 // Close 关闭终端会话
 func (s *Terminal) Close() error {
 	defer func() {
-		s.client.done()
+		s.client.Done()
 	}()
 	return s.session.Close()
 }

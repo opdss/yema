@@ -6,14 +6,16 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/wuzfei/go-helper/unit"
 	"runtime"
-	"time"
+	"yema.dev/app/utils"
 )
 
 type ServerInfo struct {
-	Os   Os   `json:"os"`
-	Cpu  Cpu  `json:"cpu"`
-	Ram  Ram  `json:"ram"`
-	Disk Disk `json:"disk"`
+	User     string `json:"user"`
+	Hostname string `json:"hostname"`
+	Os       Os     `json:"os"`
+	Cpu      Cpu    `json:"cpu"`
+	Ram      Ram    `json:"ram"`
+	Disk     Disk   `json:"disk"`
 }
 
 type Os struct {
@@ -26,8 +28,8 @@ type Os struct {
 }
 
 type Cpu struct {
-	Cpus  []float64 `json:"cpus"`
-	Cores int       `json:"cores"`
+	UsedPercent float64 `json:"used_percent"`
+	Cores       int     `json:"cores"`
 }
 
 type Ram struct {
@@ -43,7 +45,10 @@ type Disk struct {
 }
 
 func getServerInfo() (_ *ServerInfo, err error) {
-	s := ServerInfo{}
+	s := ServerInfo{
+		User:     utils.CurrentUser.Username,
+		Hostname: utils.CurrentHostname,
+	}
 	s.Os = initOS()
 	if s.Cpu, err = initCPU(); err != nil {
 		return
@@ -73,10 +78,10 @@ func initCPU() (c Cpu, err error) {
 	} else {
 		c.Cores = cores
 	}
-	if cpus, err := cpu.Percent(time.Duration(200)*time.Millisecond, true); err != nil {
+	if cpus, err := cpu.Percent(0, false); err != nil {
 		return c, err
 	} else {
-		c.Cpus = cpus
+		c.UsedPercent = cpus[0]
 	}
 	return c, nil
 }

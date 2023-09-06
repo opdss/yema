@@ -1,6 +1,6 @@
 <template>
-  <PageWrapper contentFullHeight>
-    <a-card title="上线日志" v-loading="loadingRef">
+  <PageWrapper contentFullHeight title="发布上线">
+    <a-card title="" v-loading="loadingRef">
       <alert v-if="alertMsg.msg" :type="alertMsg.type">
         <template #description>
           {{ alertMsg.msg }}
@@ -14,14 +14,11 @@
       <a-tabs :style="{ minHeight: '400px' }" v-model:activeKey="activeKey">
         <a-tab-pane
           class="text-white bg-gray-700"
-          v-for="server in servers"
-          :key="server.id"
-          :tab="server.host"
+          v-for="ss in servers"
+          :key="ss.id"
+          :tab="ss.host"
         >
-          <pre v-for="record in server.records" :key="record.id">
-[{{ server.user }}@{{ server.host }}]$ {{ record.command }}
-{{ record.output }}
-          </pre>
+          <pre class="mx-1">{{ ss.output }}</pre>
         </a-tab-pane>
       </a-tabs>
     </a-card>
@@ -31,7 +28,7 @@
   import { onMounted, reactive, ref, watchEffect } from 'vue';
   import { PageWrapper } from '/@/components/Page';
   import { Alert, Card as ACard, TabPane as ATabPane, Tabs as ATabs } from 'ant-design-vue';
-  import { ListItem as DeployListItem, RecordItem } from '/@/api/deploy/model';
+  import { ListItem as DeployListItem, ReleaseOutput } from '/@/api/deploy/model';
   import { useRoute } from 'vue-router';
   import { DeployStatus, DeployStatusShowMsg } from '/@/enums/fieldEnum';
   import { useWebSocket } from '@vueuse/core';
@@ -40,11 +37,8 @@
 
   type server = {
     id: number;
-    user: string;
     host: string;
-    port: number;
-    name: string;
-    records: { [key: number]: RecordItem };
+    output: string;
   };
   type serverItems = { [key: number]: server };
   type stateMsg = { type: 'success' | 'info' | 'error' | 'warning'; msg: string; state: number };
@@ -54,77 +48,71 @@
   const loadingRef = ref(false);
   const activeKey = ref<number>(0);
   const errMsg = ref<string>('');
-  const deployDetail = ref<DeployListItem>();
+  const deployDetail = ref<DeployListItem | null>(null);
   const servers = ref<serverItems>({
-    0: { id: 0, user: 'local', host: '127.0.0.1', port: 0, name: 'localhost', records: {} },
+    0: { id: 0, host: '127.0.0.1', output: '' },
   });
   const deployId = parseInt(route.params?.id as unknown as string);
   const alertMsg = reactive<stateMsg>({ type: 'error', msg: '', state: 0 });
 
   const { status, open: wsOpen } = useWebSocket(getDeployConsoleWs(deployId), {
     autoReconnect: false,
-    heartbeat: true,
+    heartbeat: false,
     immediate: false,
     protocols: [userStore.getToken, userStore.getCurrentSpaceId.toString()],
     onError: (_, event) => {
       alertMsg.type = 'error';
       alertMsg.msg = event.toString();
     },
+    onDisconnected: () => {
+      console.log('断开ws连接');
+    },
     onMessage: (_, event) => {
-      let data = JSON.parse(event.data);
-      if (data.type == 'records') {
-        data.records.forEach((v) => {
-          servers.value[v.server_id].records[v.id] = v;
-        });
+      console.log(event.data);
+      let data: ReleaseOutput;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
       }
-      if (data.type == 'append') {
-        //console.log(data)
-        data.records.forEach((v) => {
-          if (servers.value[v.server_id].records[v.id]) {
-            servers.value[v.server_id].records[v.id].success += v.success;
-          } else {
-            servers.value[v.server_id].records[v.id] = v;
-          }
-        });
-        //console.log(servers.value)
-      }
+      servers.value[data.server_id].output += data.data;
     },
   });
 
   async function init(id: number) {
-    try {
-      loadingRef.value = true;
-      deployDetail.value = await detailDeploy(id, true);
-    } catch (e) {
-      alertMsg.msg = (e as unknown as Error).toString();
-      return;
-    } finally {
-      loadingRef.value = false;
-    }
-    if (deployDetail.value.servers.length != 0) {
+    loadingRef.value = true;
+    await detailDeploy(id, true)
+      .then((res) => {
+        deployDetail.value = res;
+      })
+      .catch((e) => {
+        alertMsg.msg = (e as unknown as Error).toString();
+      })
+      .finally(() => {
+        loadingRef.value = false;
+      });
+
+    if (deployDetail.value?.servers.length == 0) {
       alertMsg.type = 'error';
       alertMsg.msg = '该上线单发布服务器为空，请检查在执行操作！';
       return;
     }
-    deployDetail.value.servers.forEach((v) => {
+    deployDetail.value?.servers.forEach((v) => {
       servers.value[v.id] = {
         id: v.id,
-        user: v.user,
         host: v.host,
-        port: v.port,
-        name: v.name,
-        records: {},
+        output: '',
       };
     });
-
-    let sm = DeployStatusShowMsg(deployDetail?.value.status);
+    console.log('servers', servers);
+    let sm = DeployStatusShowMsg(deployDetail.value?.status as number);
     alertMsg.msg = sm[0];
     alertMsg.type = sm[1];
-    alertMsg.state = deployDetail.value.status;
+    alertMsg.state = deployDetail.value?.status;
     //打开websocket
     if (
-      deployDetail.value.status != DeployStatus.Waiting &&
-      deployDetail.value.status != DeployStatus.Audit
+      deployDetail.value?.status != DeployStatus.Waiting &&
+      deployDetail.value?.status != DeployStatus.Audit
     ) {
       wsOpen();
     }

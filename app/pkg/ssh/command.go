@@ -3,8 +3,8 @@ package ssh
 import "context"
 
 type Command interface {
-	WithCtx(ctx context.Context) Command
 	WithEnvs(envs *Envs) Command
+	RunCtx(ctx context.Context, cmd string) error
 	Run(cmd string) error
 	Close() error
 }

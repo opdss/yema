@@ -49,7 +49,6 @@
             ].sort(function (a, b) {
               return a.value - b.value;
             }),
-            roseType: 'radius',
             animationType: 'scale',
             animationEasing: 'exponentialInOut',
             animationDelay: function () {

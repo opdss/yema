@@ -9,6 +9,9 @@ import (
 const (
 	ProjectIsInclude = 0
 	ProjectIsExclude = 1
+
+	ProjectTaskAuditEnable  = 1
+	ProjectTaskAuditDisable = 0
 )
 
 type Project struct {
@@ -25,7 +28,7 @@ type Project struct {
 	RepoType     string `gorm:"column:repo_type;size:20;notNull;default:git;comment:仓库类型" json:"repo_type"`
 
 	Excludes  string `gorm:"column:excludes;size:1000;notNull;default:'';comment:包含或者去除的文件列表" json:"excludes"` //包含或者去除的文件
-	IsInclude int8   `gorm:"column:is_include;size:1;notNull;default:0;comment:1去除0包含" json:"is_include"`      //是包含还是去除
+	IsInclude int8   `gorm:"column:is_include;notNull;default:0;comment:1去除0包含" json:"is_include"`             //是包含还是去除
 
 	TaskVars    string `gorm:"column:task_vars;size:1000;notNull;default:'';comment:全局环境变量" json:"task_vars"` //全局变量
 	PrevDeploy  string `gorm:"column:prev_deploy;size:1000;notNull;default:'';comment:编译前操作命令" json:"prev_deploy"`
@@ -35,8 +38,8 @@ type Project struct {
 
 	TargetRoot     string `gorm:"column:target_root;size:500;notNull;default:'';comment:目标路径" json:"target_root"` //目标路径
 	TargetReleases string `gorm:"column:target_releases;size:500;notNull;default:'';comment:目标代码路径" json:"target_releases"`
-	KeepVersionNum int    `gorm:"column:keep_version_num;size:4;notNull;default:5;comment:保留版本数量" json:"keep_version_num"` //保留版本数量
-	TaskAudit      int8   `gorm:"column:task_audit;size:1;notNull;default:1;comment:上线单是否开启审核" json:"task_audit"`          //上线单是否开启审核
+	KeepVersionNum int    `gorm:"column:keep_version_num;notNull;default:5;comment:保留版本数量" json:"keep_version_num"` //保留版本数量
+	TaskAudit      int8   `gorm:"column:task_audit;notNull;default:1;comment:上线单是否开启审核" json:"task_audit"`          //上线单是否开启审核
 	Description    string `gorm:"column:description;size:500;notNull;default:'';comment:简介说明" json:"description"`
 
 	Master     string `gorm:"column:master" json:"master"`
@@ -53,4 +56,8 @@ type Project struct {
 	Space       *Space       `json:"space,omitempty"`
 	Environment *Environment `json:"environment,omitempty"`
 	Servers     []Server     `gorm:"many2many:project_server" json:"servers,omitempty"`
+}
+
+func (p *Project) IsTaskAudit() bool {
+	return p.TaskAudit == ProjectTaskAuditEnable
 }

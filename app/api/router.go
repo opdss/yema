@@ -10,7 +10,7 @@ import (
 	"yema.dev/app/api/middleware"
 	"yema.dev/app/global"
 	"yema.dev/app/model"
-	"yema.dev/app/service/deploy"
+	"yema.dev/app/service/common"
 	"yema.dev/app/service/environment"
 	"yema.dev/app/service/login"
 	"yema.dev/app/service/member"
@@ -59,10 +59,6 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 
 	userService := user.NewService(global.Log, global.DB, global.Jwt)
 
-	commonCtl := &CommonCtl{}
-	r.GET("/version", commonCtl.Version)
-	r.GET("/server_info", commonCtl.ServiceInfo)
-
 	loginCtl := &LoginCtl{service: login.NewService(global.Log, global.DB, global.Jwt)}
 	r.POST("/login", loginCtl.Login)
 	r.POST("/refresh_token", loginCtl.RefreshToken)
@@ -75,6 +71,13 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 	ownerPermRouter := authRouter.Group("", middleware.Permission(userService, model.RoleOwner))
 	masterPermRouter := authRouter.Group("", middleware.Permission(userService, model.RoleMaster))
 	//developerPermMid := middleware.Permission(constants.RoleDeveloper)
+
+	//公共信息
+	{
+		ctl := &CommonCtl{service: common.NewService(global.Log, global.DB)}
+		r.GET("/version", ctl.Version)
+		r.GET("/server_info", ctl.ServiceInfo)
+	}
 
 	//用户管理
 	{
@@ -146,7 +149,7 @@ func apiRoutes(r *gin.RouterGroup, s *Server) {
 
 	//部署管理
 	{
-		ctl := &DeployCtl{service: deploy.NewService(global.DB, global.Log)}
+		ctl := &DeployCtl{service: global.Service.Deploy()}
 		masterPermRouter.GET("/deploy", ctl.List)
 		masterPermRouter.GET("/deploy/:id", ctl.Detail)
 		masterPermRouter.POST("/deploy", ctl.Create)

@@ -1,10 +1,8 @@
 package ssh
 
 import (
-	"context"
 	"fmt"
 	"testing"
-	"time"
 )
 
 //func TestSshClient_Key(t *testing.T) {
@@ -88,31 +86,31 @@ func (st *s) Write(p []byte) (n int, err error) {
 }
 
 func TestNewSession(t *testing.T) {
-	_ = Init(&Config{Timeout: time.Second * 10})
-	//cmd := "echo ${DD}"
-	sess, err := NewRemoteExec(ServerConfig{
-		Host:     "192.168.1.180",
-		User:     "ipfs",
-		Password: "ipfs",
-		Port:     22,
-	})
-	if err == nil {
-		fmt.Println(err)
-		if err == nil {
-			ctx, cancel := context.WithCancel(context.Background())
-			go func() {
-				t := time.NewTimer(time.Second * 5)
-				select {
-				case <-t.C:
-					cancel()
-					return
-				}
-			}()
-			sess.WithCtx(ctx)
-			sess.WithEnvs(NewEnvsBySliceKV([]string{"BD=baidu.com"}))
-			b, err := sess.Run("ping $BD")
-			fmt.Println(string(b), err)
-		}
-	}
-	fmt.Println(111, err)
+	//c, err := NewClient(&ServerConfig{Timeout: time.Second * 10})
+	//if err !
+	//sess, err := NewRemoteExec(ServerConfig{
+	//	Host:     "192.168.1.180",
+	//	User:     "ipfs",
+	//	Password: "ipfs",
+	//	Port:     22,
+	//})
+	//if err == nil {
+	//	fmt.Println(err)
+	//	if err == nil {
+	//		ctx, cancel := context.WithCancel(context.Background())
+	//		go func() {
+	//			t := time.NewTimer(time.Second * 5)
+	//			select {
+	//			case <-t.C:
+	//				cancel()
+	//				return
+	//			}
+	//		}()
+	//		sess.WithCtx(ctx)
+	//		sess.WithEnvs(NewEnvsBySliceKV([]string{"BD=baidu.com"}))
+	//		b, err := sess.Run("ping $BD")
+	//		fmt.Println(string(b), err)
+	//	}
+	//}
+	//fmt.Println(111, err)
 }

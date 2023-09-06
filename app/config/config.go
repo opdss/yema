@@ -9,17 +9,19 @@ import (
 	"yema.dev/app/pkg/log"
 	"yema.dev/app/pkg/repo"
 	"yema.dev/app/pkg/ssh"
+	"yema.dev/app/service"
 )
 
 var Cfg *Config
 
 type Config struct {
-	Api  api.Config
-	Db   db.Config
-	Repo repo.Config
-	JWT  jwt.Config
-	Log  log.Config
-	Ssh  ssh.Config
+	Api     api.Config
+	Db      db.Config
+	Repo    repo.Config
+	JWT     jwt.Config
+	Log     log.Config
+	Ssh     ssh.Config
+	Service service.Config
 }
 
 func (conf Config) Init() {
@@ -31,6 +33,7 @@ func (conf Config) Init() {
 		global.InitJwt(&conf.JWT),
 		global.InitRepo(&conf.Repo),
 		global.InitSsh(&conf.Ssh),
+		global.InitService(&conf.Service),
 	)
 	if errs2.Err() != nil {
 		panic(errs2.Err())

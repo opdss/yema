@@ -1,13 +1,14 @@
 <template>
   <Footer :class="prefixCls" v-if="getShowLayoutFooter" ref="footerRef">
-    <div :class="`${prefixCls}__links`">
-      <a @click="openWindow(SITE_URL)">{{ t('layout.footer.onlinePreview') }}</a>
+    <a @click="openWindow(SITE_URL)">{{ t('layout.footer.onlinePreview') }}</a>
+    &nbsp;
+    <a @click="openWindow(GITHUB_URL)">{{ t('layout.footer.onlineDocument') }}</a>
 
-      <GithubFilled @click="openWindow(GITHUB_URL)" :class="`${prefixCls}__github`" />
+    &nbsp;
+    <!-- <GithubFilled @click="openWindow(GITHUB_URL)" :class="`${prefixCls}__github`" /> -->
 
-      <a @click="openWindow(DOC_URL)">{{ t('layout.footer.onlineDocument') }}</a>
-    </div>
-    <div>Copyright &copy;2020 Vben Admin</div>
+    <a @click="openWindow(DOC_URL)">{{ t('layout.footer.onlineDocument') }}</a>
+    <!-- <div>Copyright &copy;2020 Vben Admin</div> -->
   </Footer>
 </template>
 
@@ -69,6 +70,7 @@
   @hover-color: rgba(0, 0, 0, 0.85);
 
   .@{prefix-cls} {
+    padding: 5px 0;
     color: @normal-color;
     text-align: center;
 

@@ -10,25 +10,20 @@ import (
 type RemoteExec struct {
 	client *client
 	envs   *Envs
-	ctx    context.Context
 	output io.Writer
 }
 
 func (e *RemoteExec) Close() error {
-	e.client.done()
+	e.client.Done()
 	return nil
 }
 
-func (e *RemoteExec) WithCtx(ctx context.Context) Command {
-	e.ctx = ctx
-	return e
-}
 func (e *RemoteExec) WithEnvs(envs *Envs) Command {
 	e.envs = envs
 	return e
 }
 
-func (e *RemoteExec) Run(cmd string) error {
+func (e *RemoteExec) RunCtx(ctx context.Context, cmd string) error {
 	sess, err := e.client.client.NewSession()
 	if err != nil {
 		return err
@@ -40,7 +35,7 @@ func (e *RemoteExec) Run(cmd string) error {
 			closed = true
 		}
 	}()
-	if !e.envs.Empty() {
+	if e.envs != nil && !e.envs.Empty() {
 		cmd = fmt.Sprintf("%s && %s", strings.Join(e.envs.SliceKV(), " "), cmd)
 	}
 
@@ -48,17 +43,25 @@ func (e *RemoteExec) Run(cmd string) error {
 		sess.Stdout = e.output
 		sess.Stderr = e.output
 	}
-	if e.ctx != nil {
+	if ctx != nil {
+		closeCh := make(chan struct{})
+		defer close(closeCh)
 		go func() {
 			select {
-			case <-e.ctx.Done():
+			case <-ctx.Done():
 				if !closed {
 					_ = sess.Close()
 					closed = true
 				}
 				return
+			case <-closeCh:
+				return
 			}
 		}()
 	}
 	return sess.Run(cmd)
+}
+
+func (e *RemoteExec) Run(cmd string) error {
+	return e.RunCtx(nil, cmd)
 }

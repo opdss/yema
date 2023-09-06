@@ -3,14 +3,30 @@
     v-bind="$attrs"
     @register="register"
     :title="'项目检测-' + projectDetail?.name"
-    width="700px"
+    width="800px"
     @visible-change="handleVisibleChange"
+    :closable="false"
+    :keyboard="false"
+    :maskClosable="false"
   >
-    <div class="pt-3px pr-3px" v-loading="loadingRef" v-loading-tip="'项目检测中...'">
+    <Result
+      v-if="isSuccessRef"
+      status="success"
+      title="检测成功"
+      sub-title="现在可以自由的对该项目进行发布上线操作了"
+    />
+    <div
+      v-if="!isSuccessRef"
+      class="pt-3px pr-3px"
+      v-loading="loadingRef"
+      loading-tip="'项目检测中...'"
+    >
       <a-list item-layout="horizontal" :data-source="detectionList">
         <template #renderItem="{ item }">
           <a-list-item>
-            <a-list-item-meta :description="item.todo">
+            <a-list-item-meta
+              :description="item.todo + (item.error ? '  (错误提示:' + item.error + ')' : '')"
+            >
               <template #title>
                 {{ item.title }}
               </template>
@@ -18,7 +34,6 @@
                 <CloseCircleOutlined style="color: red; font-size: 18px" />
               </template>
             </a-list-item-meta>
-            {{ item.error }}
           </a-list-item>
         </template>
       </a-list>
@@ -30,10 +45,9 @@
   import { DetectionInfoItem } from '/@/api/project/model';
   import { CloseCircleOutlined } from '@ant-design/icons-vue';
   import { useUserStore } from '/@/store/modules/user';
-  import { useMessage } from '/@/hooks/web/useMessage';
-  import { reactive, ref, nextTick } from 'vue';
-  import { useLoading } from '/@/components/Loading';
+  import { reactive, ref, nextTick, watchEffect } from 'vue';
   import {
+    Result,
     List as AList,
     ListItem as AListItem,
     ListItemMeta as AListItemMeta,
@@ -43,9 +57,8 @@
 
   const userStore = useUserStore();
   const loadingRef = ref(true);
-  const { createMessage } = useMessage();
-  const detectionList = reactive<DetectionInfoItem[]>([]);
-  const wrapEl = ref<ElRef>(null);
+  const isSuccessRef = ref(false);
+  let detectionList = reactive<DetectionInfoItem[]>([]);
 
   const props = defineProps({
     projectDetail: { type: Object },
@@ -55,44 +68,59 @@
     console.log('useModalInner', data);
   });
 
-  let closeFn: Function | null = null;
+  const {
+    status,
+    close: wsClose,
+    open: wsOpen,
+  } = useWebSocket(getDetectionProjectWs(props.projectDetail?.id as number), {
+    autoReconnect: false,
+    immediate: false,
+    protocols: [userStore.getToken, userStore.getCurrentSpaceId.toString()],
+    onConnected: () => {},
+    onError: (ws, event) => {
+      loadingRef.value = false;
+      console.log('连接失败', ws, event);
+    },
+    onDisconnected: (ws, event) => {
+      loadingRef.value = false;
+      console.log('连接断开', ws, event);
+    },
+    onMessage: (ws, event) => {
+      console.log(ws, event);
+      if (event.data == 'success') {
+        isSuccessRef.value = true;
+        loadingRef.value = false;
+      } else if (event.data == 'error') {
+        loadingRef.value = false;
+      } else {
+        let obj: DetectionInfoItem = JSON.parse(event.data);
+        if (obj.server_id) {
+          let s = servers[obj.server_id];
+          if (s) {
+            obj.title = obj.title + '[' + s.user + '@' + s.host + ':' + s.port + ']';
+          }
+        }
+        detectionList.push(obj);
+      }
+    },
+  });
+
+  watchEffect(() => {
+    console.log('status.value', status.value);
+  });
+
+  let servers = {};
   function handleVisibleChange(v) {
-    console.log('handleVisibleChange', v, props.projectDetail);
-    //v && props.userData && nextTick(() => onDataReceive(props.userData));
     if (v && props.projectDetail) {
       nextTick(() => {
-        closeFn = openWs(props.projectDetail?.id as number);
+        wsOpen();
       });
     } else {
-      if (closeFn) {
-        closeFn();
-        closeFn = null;
-      }
+      console.log('test');
+      wsClose();
+      detectionList = reactive<DetectionInfoItem[]>([]);
+      isSuccessRef.value = false;
+      loadingRef.value = true;
     }
-  }
-
-  function openWs(projectId: number): Function {
-    const { close } = useWebSocket(getDetectionProjectWs(projectId), {
-      autoReconnect: false,
-      immediate: true,
-      protocols: [userStore.getToken, userStore.getCurrentSpaceId.toString()],
-      onConnected: () => {},
-      onError: (ws, event) => {
-        console.log('连接失败', ws, event);
-      },
-      onDisconnected: (ws, event) => {
-        console.log('连接断开', ws, event);
-      },
-      onMessage: (ws, event) => {
-        console.log(ws, event);
-        if (event.data == 'success') {
-        } else if (event.data == 'error') {
-          loadingRef.value = false;
-        } else {
-          detectionList.push(JSON.parse(event.data));
-        }
-      },
-    });
-    return close;
   }
 </script>

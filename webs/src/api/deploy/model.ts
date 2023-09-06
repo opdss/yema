@@ -42,4 +42,9 @@ export interface RecordItem {
   [key: string]: any;
 }
 
+export interface ReleaseOutput {
+  server_id: number;
+  data: string;
+}
+
 export type ListItemRes = BasicFetchResult<ListItem>;

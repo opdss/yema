@@ -1,6 +1,7 @@
 package common
 
 import (
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"sync"
 )
@@ -15,12 +16,13 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	log *zap.Logger
+	db  *gorm.DB
 }
 
-func NewService(db *gorm.DB) *Service {
+func NewService(log *zap.Logger, db *gorm.DB) *Service {
 	onceService.Do(func() {
-		service = &Service{db: db}
+		service = &Service{log: log, db: db}
 	})
 	return service
 }

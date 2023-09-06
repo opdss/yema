@@ -1,12 +1,14 @@
 import { ListReq, CreateReq, ListItemRes, ListItem } from './model';
 import { defHttp } from '/@/utils/http/axios';
+import { getWebsocketApiUrl } from '/@/utils/common';
 
 enum Api {
   Deploy = '/deploy',
   DeployId = '/deploy/{id}',
-  DeployStart = '/deploy/{id}/release',
+  DeployRelease = '/deploy/{id}/release',
+  DeployStopRelease = '/deploy/{id}/stop_release',
   DeployAudit = '/deploy/{id}/audit',
-  DeployConsoleWs = 'ws://localhost:8989/api/deploy/{id}/console',
+  DeployConsoleWs = '/deploy/{id}/console',
 }
 
 export const getDeployListByPage = (params?: ListReq) =>
@@ -26,7 +28,7 @@ export const detailDeploy = (id: number, notAlertErrMsg: boolean | undefined) =>
 
 export const startDeploy = (id: number, notAlertErrMsg: boolean | undefined) =>
   defHttp.get<ListItem>(
-    { url: Api.DeployStart.replace('{id}', id.toString()) },
+    { url: Api.DeployRelease.replace('{id}', id.toString()) },
     notAlertErrMsg ? { errorMessageMode: 'none' } : {},
   );
 
@@ -37,4 +39,4 @@ export const auditDeploy = (id: number, audit: boolean) =>
   });
 
 export const getDeployConsoleWs = (id: number) =>
-  Api.DeployConsoleWs.replace('{id}', id.toString());
+  getWebsocketApiUrl(Api.DeployConsoleWs.replace('{id}', id.toString()));

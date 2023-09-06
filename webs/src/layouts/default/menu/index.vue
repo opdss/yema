@@ -5,6 +5,7 @@
   import { BasicMenu } from '/@/components/Menu';
   import { SimpleMenu } from '/@/components/SimpleMenu';
   import { AppLogo } from '/@/components/Application';
+  import Version from './Version.vue';
 
   import { MenuModeEnum, MenuSplitTyeEnum } from '/@/enums/menuEnum';
 
@@ -143,7 +144,10 @@
         // console.log(menus);
         if (!menus || !menus.length) return null;
         return !props.isHorizontal ? (
-          <SimpleMenu {...menuProps} isSplitMenu={unref(getSplit)} items={menus} />
+          <div>
+            <SimpleMenu {...menuProps} isSplitMenu={unref(getSplit)} items={menus} />
+            <Version collapse={menuProps.collapse} />
+          </div>
         ) : (
           <BasicMenu
             {...(menuProps as any)}

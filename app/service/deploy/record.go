@@ -9,39 +9,48 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"os/exec"
+	"sync"
 	"time"
-	"yema.dev/app/global"
 	"yema.dev/app/model"
 	"yema.dev/app/pkg/ssh"
 )
 
-type writer struct {
+type cmdOutput struct {
+	mux sync.RWMutex
 	buf bytes.Buffer
 	w   io.Writer
 }
 
-func (w *writer) Write(b []byte) (n int, err error) {
+func (w *cmdOutput) Write(b []byte) (n int, err error) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
 	n, err = w.buf.Write(b)
 	if err != nil {
-		return 0, err
+		return n, err
 	}
 	return w.w.Write(b)
 }
 
-func (w *writer) Bytes() []byte {
+func (w *cmdOutput) Bytes() []byte {
+	w.mux.RLock()
+	defer w.mux.RUnlock()
 	return w.buf.Bytes()
 }
 
 type Record struct {
-	db     *gorm.DB
-	log    *zap.Logger
+	db  *gorm.DB
+	log *zap.Logger
+	ssh *ssh.Ssh
+
 	model  *model.Record
 	server *model.Server
 	envs   *ssh.Envs
-	writer io.Writer
+	output io.Writer //此次执行日志
+
+	startTime time.Time
 }
 
-func NewRecordLocal(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd string, envs *ssh.Envs, releaseWriter io.Writer) *Record {
+func NewRecordLocal(db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, taskId, userId int64, cmd string, envs *ssh.Envs, releaseOutput io.Writer) *Record {
 	return &Record{
 		model: &model.Record{
 			UserId:   userId,
@@ -51,14 +60,17 @@ func NewRecordLocal(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd stri
 			Status:   -1,
 			Envs:     envs.SliceKV(),
 		},
-		writer: releaseWriter,
+		output: &cmdOutput{buf: bytes.Buffer{}, w: releaseOutput},
+
+		envs: envs,
 
 		db:  db,
 		log: log,
+		ssh: ssh,
 	}
 }
 
-func NewRecordRemote(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd string, server *model.Server, envs *ssh.Envs, releaseWriter io.Writer) *Record {
+func NewRecordRemote(db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, taskId, userId int64, cmd string, server *model.Server, envs *ssh.Envs, releaseOutput io.Writer) *Record {
 	return &Record{
 		model: &model.Record{
 			UserId:   userId,
@@ -68,10 +80,15 @@ func NewRecordRemote(db *gorm.DB, log *zap.Logger, taskId, userId int64, cmd str
 			Status:   -1,
 			Envs:     envs.SliceKV(),
 		},
-		writer: &writer{buf: bytes.Buffer{}, w: releaseWriter},
+
+		output: &cmdOutput{buf: bytes.Buffer{}, w: releaseOutput},
+
+		server: server,
+		envs:   envs,
 
 		db:  db,
 		log: log,
+		ssh: ssh,
 	}
 }
 
@@ -79,17 +96,21 @@ func (r *Record) Run(ctx context.Context) (err error) {
 	startT := time.Now()
 	var command ssh.Command
 	if r.server == nil {
-		command = ssh.NewLocalExec(r.writer)
+		r.log.Info("本地执行命令", zap.String("cmd", r.model.Command))
+		command = ssh.NewLocalExec(r.output)
 	} else {
-		command, err = global.Ssh.NewRemoteExec(ssh.ServerConfig{
-			Host:     r.server.Host,
-			User:     r.server.User,
-			Password: "",
-			Port:     r.server.Port,
-		}, r.writer)
+		r.log.Info("服务器执行命令", zap.String("cmd", r.model.Command), zap.Int64("server", r.model.ServerId))
+		command, err = r.ssh.NewRemoteExec(ssh.ServerConfig{
+			Host: r.server.Host,
+			User: r.server.User,
+			Port: r.server.Port,
+		}, r.output)
 	}
 	if err == nil {
-		err = command.WithEnvs(r.envs).WithCtx(ctx).Run(r.model.Command)
+		defer func() {
+			_ = command.Close()
+		}()
+		err = command.WithEnvs(r.envs).RunCtx(ctx, r.model.Command)
 	}
 	if err != nil {
 		if e, ok := err.(*ssh2.ExitError); ok {
@@ -106,15 +127,24 @@ func (r *Record) Run(ctx context.Context) (err error) {
 	return r.save()
 }
 
-func (r *Record) Save(status int, output *string, runtime int64) error {
-	r.model.RunTime = runtime
+func (r *Record) SetSaveTime() {
+	r.startTime = time.Now()
+}
+
+func (r *Record) Save(status int, output string) error {
+	if r.startTime.IsZero() {
+		r.model.RunTime = 0
+	} else {
+		r.model.RunTime = time.Since(r.startTime).Milliseconds()
+	}
 	r.model.Status = status
-	r.model.Output = *output
+	r.model.Output = output + "\r\n"
+	r.output.Write([]byte(r.model.Output))
 	return r.save()
 }
 
 func (r *Record) Output() string {
-	return string(r.writer.(*writer).Bytes())
+	return string(r.output.(*cmdOutput).Bytes())
 }
 
 func (r *Record) save() error {

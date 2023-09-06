@@ -102,7 +102,7 @@
         </a-descriptions-item>
       </a-descriptions>
     </a-card>
-    <ModalDetection @register="register" :projectDetail="projectDetail" />
+    <ModalDetection v-if="isReady" @register="register" :projectDetail="projectDetail" />
   </PageWrapper>
 </template>
 <script lang="ts" setup>
@@ -133,6 +133,7 @@
 
   const projectId = parseInt(route.params?.id as unknown as string);
   const loadingRef = ref(false);
+  const isReady = ref(false);
   const projectDetail = ref<Detail | {}>({});
   const prefixCls = 'project-detail';
 
@@ -140,6 +141,7 @@
     try {
       loadingRef.value = true;
       projectDetail.value = await detailProject(id, true);
+      isReady.value = true;
     } catch (e) {
       let msg = (e as unknown as Error).toString();
       if (msg == '') {

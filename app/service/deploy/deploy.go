@@ -6,65 +6,104 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"sync"
+	"time"
 	"yema.dev/app/model"
+	"yema.dev/app/pkg/repo"
+	"yema.dev/app/pkg/ssh"
 )
 
 var Error = errs.Class("Deploy")
-var ErrorTaskOver = Error.New("部署任务已完成或未创建")
+var ErrorTaskFinish = Error.New("部署任务已完成或未创建,未在发布队列中")
 
-type Deploy struct {
-	mux   *sync.RWMutex
-	tasks map[int64]*Task
-
-	db  *gorm.DB
-	log *zap.Logger
+type taskRunning struct {
+	task   *Task
+	cancel func()
 }
 
-func NewDeploy(db *gorm.DB, log *zap.Logger) *Deploy {
-	return &Deploy{
-		mux:   &sync.RWMutex{},
-		tasks: make(map[int64]*Task),
+type deploy struct {
+	mux   sync.Mutex
+	tasks map[int64]*taskRunning
+
+	db   *gorm.DB
+	log  *zap.Logger
+	ssh  *ssh.Ssh
+	repo *repo.Repos
+
+	MaxDeployNum      int           //最大同时部署任务数量
+	MaxReleaseTimeout time.Duration //最大部署超时时间
+}
+
+func newDeploy(db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, repo *repo.Repos, conf *Config) *deploy {
+	d := &deploy{
+		tasks: make(map[int64]*taskRunning),
 		db:    db,
 		log:   log,
+		ssh:   ssh,
+		repo:  repo,
 	}
+	if conf != nil {
+		d.MaxDeployNum = conf.MaxDeploy
+		d.MaxReleaseTimeout = conf.MaxReleaseTimeout
+	}
+	return d
 }
 
 // Start 开始部署
-func (d *Deploy) Start(taskModel *model.Task) error {
+func (d *deploy) Start(taskModel *model.Task) error {
 	d.mux.Lock()
 	defer d.mux.Unlock()
 	if _, ok := d.tasks[taskModel.ID]; ok {
-		return Error.New("task[%d]已经开始部署", taskModel.ID)
+		return Error.New("该任务[%d]已在部署中", taskModel.ID)
 	}
-	task, err := NewTask(taskModel, d.db, d.log)
+	if len(d.tasks) >= d.MaxDeployNum {
+		return Error.New("已经超出部署队列最大数量(%d)，请稍后再试", d.MaxDeployNum)
+	}
+	task, err := NewTask(taskModel, d.db, d.log, d.ssh, d.repo)
 	if err != nil {
 		return err
 	}
-	d.tasks[taskModel.ID] = task
-	return d.tasks[taskModel.ID].Start()
+	ctx, cancel := context.WithTimeout(context.Background(), d.MaxReleaseTimeout)
+	d.tasks[taskModel.ID] = &taskRunning{
+		task: task,
+		cancel: func() {
+			cancel()
+		},
+	}
+	//开始部署
+	err = d.tasks[taskModel.ID].task.Start(ctx)
+	if err == nil {
+		//等待完成处理
+		go func() {
+			err := d.tasks[taskModel.ID].task.Wait()
+			if err != nil {
+				d.log.Error("部署任务完成，有错误",
+					zap.Int64("taskId", taskModel.ID), zap.Error(err))
+			} else {
+				d.log.Info("部署任务完成，成功",
+					zap.Int64("taskId", taskModel.ID))
+			}
+		}()
+	}
+	return err
 }
 
 // Stop 中止部署
-func (d *Deploy) Stop(taskId int64) error {
+func (d *deploy) Stop(taskId int64) error {
 	d.mux.Lock()
 	defer d.mux.Unlock()
-	if v, ok := d.tasks[taskId]; ok {
-		err := v.Stop()
-		if err != nil {
-			return err
-		}
-		delete(d.tasks, taskId)
+	if _, ok := d.tasks[taskId]; ok {
+		d.tasks[taskId].cancel()
 	}
 	return nil
 }
 
 // Output 部署日志输出
-func (d *Deploy) Output(ctx context.Context, taskId int64) (msg <-chan Msg, err error) {
+func (d *deploy) Output(ctx context.Context, taskId int64) (msg <-chan *ConsoleMsg, err error) {
 	d.mux.Lock()
 	defer d.mux.Unlock()
-	if v, ok := d.tasks[taskId]; ok {
-		msg = v.Output(ctx)
+	if _, ok := d.tasks[taskId]; ok {
+		msg = d.tasks[taskId].task.Output(ctx)
 		return
 	}
-	return nil, ErrorTaskOver
+	return nil, ErrorTaskFinish
 }

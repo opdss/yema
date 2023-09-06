@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"yema.dev/app/model"
 	"yema.dev/app/pkg/db"
 )
 
@@ -14,7 +13,7 @@ type CreateReq struct {
 	Branch      string  `json:"branch" binding:"omitempty,max=50"`
 	CommitId    string  `json:"commit_id" binding:"omitempty,max=50"`
 	Description string  `json:"description" binding:"omitempty,max=500"`
-	ServerIds   []int64 `json:"server_ids" binding:"omitempty"`
+	ServerIds   []int64 `json:"server_ids" binding:"required"`
 }
 
 type ListReq struct {
@@ -29,16 +28,7 @@ type AuditReq struct {
 	Audit       bool  `json:"audit" `
 }
 
-const TaskConsoleMsgRecords = "records"
-const TaskConsoleMsgRecord = "record"
-const TaskConsoleMsgAppend = "append"
-
 type ConsoleMsg struct {
-	Server string
-	Data   []byte
-}
-
-type TaskConsoleMsg struct {
-	Type    string          `json:"type"`
-	Records []*model.Record `json:"records,omitempty"`
+	ServerId int64  `json:"server_id"`
+	Data     string `json:"data"`
 }

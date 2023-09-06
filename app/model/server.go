@@ -21,8 +21,8 @@ type Server struct {
 	UpdatedAt time.Time      `gorm:"column:updated_at;type:datetime;notNull" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"-"`
 
-	Projects []*Project `gorm:"many2many:project_server" json:"projects"`
-	Tasks    []*Task    `gorm:"many2many:task_server" json:"tasks"`
+	Projects []Project `gorm:"many2many:project_server" json:"projects,omitempty'"`
+	Tasks    []Task    `gorm:"many2many:task_server" json:"tasks,omitempty"`
 }
 
 func (receiver *Server) Hostname() string {

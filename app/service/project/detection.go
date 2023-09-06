@@ -34,6 +34,12 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 	dMsgChan := make(chan *DetectionMsg)
 	defer close(dMsgChan)
 	sendMsg := sendDetectionMsgFn(dMsgChan)
+	isOver := false
+	defer func() {
+		if !isOver {
+			_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
+		}
+	}()
 
 	//检测逻辑
 	go func() {
@@ -41,18 +47,19 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 		defer func() {
 			if _err := recover(); _err != nil {
 				srv.log.Error("1.DetectionWs 已关闭写入渠道", zap.Any("_err", _err))
+				_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
 			} else {
+				isOver = true
+				if err == nil {
+					_ = wsConn.WriteMessage(websocket.TextMessage, []byte("success"))
+				} else {
+					_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
+				}
 				cancel()
 			}
 		}()
-		defer func() {
-			if err != nil {
-				_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
-			} else {
-				_ = wsConn.WriteMessage(websocket.TextMessage, []byte("success"))
-			}
-		}()
-		sendMsg("检测项目不存在", "请检查项目是否存在，或者刷新页面再尝试", "", 0)
+
+		srv.log.Info("获取数据库项目信息")
 		project := model.Project{}
 		err = srv.db.Where(spaceWithId).Preload("Servers").First(&project).Error
 		if err != nil {
@@ -60,6 +67,7 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 			return
 		}
 		//clone项目代码
+		srv.log.Info("clone仓库代码")
 		_, err = srv.repo.New(repo.TypeRepo(project.RepoType), project.RepoUrl, strconv.Itoa(int(project.ID)))
 		if err != nil {
 			sendMsg("代码clone失败", "1、请检查仓库地址："+project.RepoUrl+"是否正确；\n 2、请检查"+project.RepoType+"相关配置是否正确", err.Error(), 0)
@@ -70,6 +78,8 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 			err = errors.New("项目未绑定发布服务器")
 			return
 		}
+
+		srv.log.Info("检查服务器配置信息")
 		g := sync.WaitGroup{}
 		//检查服务器
 		for _, server := range project.Servers {
@@ -81,6 +91,8 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 					}
 					g.Done()
 				}()
+
+				srv.log.Info("连接服务器", zap.String("server", server.Hostname()))
 				buf := bytes.Buffer{}
 				re, _err := srv.ssh.NewRemoteExec(ssh.ServerConfig{User: server.User, Port: server.Port, Host: server.Host}, &buf)
 				if _err != nil {
@@ -93,6 +105,7 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 				}
 				defer func() { _ = re.Close() }()
 
+				srv.log.Info("服务器创建发布目录", zap.String("server", server.Hostname()))
 				webroot := filepath.Dir(project.TargetRoot)
 				cmd := fmt.Sprintf("[ -d %s ] || mkdir -p %s", webroot, webroot)
 				_err = re.Run(cmd)
@@ -105,6 +118,7 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 					return
 				}
 
+				srv.log.Info("服务器检查软链接", zap.String("server", server.Hostname()))
 				cmd = fmt.Sprintf("[ -L \"%s\" ] && echo \"true\" || echo \"false\"", project.TargetRoot)
 				buf.Reset()
 				_err = re.Run(cmd)
@@ -137,6 +151,7 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 			return nil
 		case msg := <-dMsgChan:
 			res, err = json.Marshal(msg)
+			srv.log.Debug("项目检测回送客户端消息", zap.ByteString("msg", res), zap.Error(err))
 			if err != nil {
 				srv.log.Error("DetectionWs json.Marshal error", zap.Error(err))
 				continue

@@ -7,61 +7,49 @@ import (
 	"fmt"
 	"github.com/wuzfei/go-helper/compress"
 	"github.com/wuzfei/go-helper/files"
-	"github.com/wuzfei/go-helper/slices"
+	"github.com/zeebo/errs"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gorm.io/gorm"
 	"io"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-	"yema.dev/app/global"
 	"yema.dev/app/model"
 	"yema.dev/app/pkg/repo"
 	"yema.dev/app/pkg/ssh"
+	"yema.dev/app/utils"
 )
 
 var ErrStopDeploy = Error.New("终止发布任务")
 
-var localSshSym string
 var localServerId = int64(0)
-var currentUser *user.User
-var currentHost string
 
-func init() {
-	var err error
-	currentUser, err = user.Current()
-	if err != nil {
-		panic("获取当前用户错误！")
-	}
-	currentHost, _ = os.Hostname()
-	localSshSym = fmt.Sprintf("%s@%s", currentUser, currentHost)
+type RemoteErrs struct {
+	sync.Map
 }
-
-type RemoteErrs map[int64]error
 
 func (r RemoteErrs) Error() string {
 	res := ""
-	for k, v := range r {
-		res = fmt.Sprintf("[%d]%s;%s", k, v, res)
-	}
+	r.Range(func(key, value any) bool {
+		res = fmt.Sprintf("[%d]%s;%s", key, value, res)
+		return true
+	})
 	return res
 }
 
-func (r RemoteErrs) String() string {
-	res, _ := json.Marshal(r)
-	return string(res)
-}
-
 func (r RemoteErrs) HasSuccess() bool {
-	for _, v := range r {
-		if v == nil {
-			return true
+	flag := false
+	r.Range(func(key, value any) bool {
+		if value == nil {
+			flag = true
+			return false
 		}
-	}
-	return false
+		return true
+	})
+	return flag
 }
 
 type deployDirs struct {
@@ -72,13 +60,28 @@ type deployDirs struct {
 	remoteRootLink string //远程发布程序软连接，比如nginx将指向此地址
 }
 
-func (dd *deployDirs) Remove() {
+func (dd *deployDirs) Remove() error {
+	//移除本地目录
+	err := errs.Combine(
+		os.RemoveAll(dd.localWarehouseDir),
+		os.RemoveAll(dd.localCodePackage))
+	return err
+}
 
+func (dd *deployDirs) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	enc.AddString("localWarehouseDir", dd.localWarehouseDir)
+	enc.AddString("localCodePackage", dd.localCodePackage)
+	enc.AddString("remoteReleaseDir", dd.remoteReleaseDir)
+	enc.AddString("remoteReleasePackage", dd.remoteReleasePackage)
+	enc.AddString("remoteRootLink", dd.remoteRootLink)
+	return nil
 }
 
 type Task struct {
-	db  *gorm.DB
-	log *zap.Logger
+	db   *gorm.DB
+	log  *zap.Logger
+	ssh  *ssh.Ssh
+	repo *repo.Repos
 
 	userId         int64 //操作人员
 	model          *model.Task
@@ -87,23 +90,22 @@ type Task struct {
 	started    bool
 	deployDirs *deployDirs
 
-	ctx    context.Context
-	cancel context.CancelFunc
-
 	doneError chan error
 
 	taskLogs map[int64]*TaskLog
 }
 
-func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger) (*Task, error) {
+func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, repo *repo.Repos) (*Task, error) {
 	taskLogs := make(map[int64]*TaskLog)
 	for i := range taskModel.Servers {
 		taskLogs[taskModel.Servers[i].ID] = &TaskLog{}
 	}
 	taskLogs[localServerId] = &TaskLog{}
 	return &Task{
-		db:  db,
-		log: log,
+		db:   db,
+		log:  log,
+		ssh:  ssh,
+		repo: repo,
 
 		doneError: make(chan error),
 		model:     taskModel,
@@ -111,15 +113,15 @@ func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger) (*Task, error)
 	}, nil
 }
 
-func (t *Task) Run() error {
-	err := t.Start()
+func (t *Task) Run(ctx context.Context) error {
+	err := t.Start(ctx)
 	if err != nil {
 		return err
 	}
 	return t.Wait()
 }
 
-func (t *Task) Start() (err error) {
+func (t *Task) Start(ctx context.Context) (err error) {
 	if t.started {
 		return Error.New("deploy task already started")
 	}
@@ -140,21 +142,16 @@ func (t *Task) Start() (err error) {
 		return Error.Wrap(err)
 	}
 
-	//启动发布协程, 可设置超时
-	if t.ReleaseTimeout > 0 {
-		t.ctx, t.cancel = context.WithTimeout(context.Background(), t.ReleaseTimeout)
-	} else {
-		t.ctx, t.cancel = context.WithCancel(context.Background())
-	}
 	go func() {
-		t.start()
+		t.start(ctx)
 	}()
 	return
 }
 
 // prevDeploy step1.检出代码前置操作
-func (t *Task) prevDeploy() error {
+func (t *Task) prevDeploy(ctx context.Context) error {
 	//1、检查仓库，
+	t.log.Debug("1.1、检查仓库")
 	_repo, err := t.getRepo()
 	if err != nil {
 		return errors.New("获取代码仓库错误：" + err.Error())
@@ -170,10 +167,11 @@ func (t *Task) prevDeploy() error {
 		remoteRootLink:       t.model.Project.TargetRoot,
 	}
 	//2、执行用户打包前命令
+	t.log.Debug("1.2、执行用户打包前命令")
 	commands := parseCommands(t.model.Project.PrevDeploy)
 	for _, cmd := range commands {
 		r := t.newRecordLocal(cmd, t.envs())
-		if err = r.Run(t.ctx); err != nil {
+		if err = r.Run(ctx); err != nil {
 			return err
 		}
 	}
@@ -181,8 +179,9 @@ func (t *Task) prevDeploy() error {
 }
 
 // deploy step2.检出代码
-func (t *Task) deploy() error {
+func (t *Task) deploy(ctx context.Context) error {
 	//1、检出代码
+	t.log.Debug("2.1、检出代码")
 	_repo, err := t.getRepo()
 	if err != nil {
 		return errors.New("获取代码仓库错误：" + err.Error())
@@ -198,6 +197,7 @@ func (t *Task) deploy() error {
 		return err
 	}
 	//2、复制发布版本代码到新目录，以便下面执行编译等操作
+	t.log.Debug("2.2、复制发布版本代码到新目录，以便下面执行编译等操作")
 	if _, err = files.CopyDirToDir(t.deployDirs.localWarehouseDir, _repo.Path()); err != nil {
 		return errors.New("检出代码失败：" + err.Error())
 	}
@@ -205,38 +205,38 @@ func (t *Task) deploy() error {
 }
 
 // postDeploy step3.推送到服务器前的操作，比如下载依赖，编译等
-func (t *Task) postDeploy() error {
-	//1、在检出代码执行用户命令
+func (t *Task) postDeploy(ctx context.Context) error {
+	//1、在检出代码执行用户发布前命令
+	t.log.Debug("3.1、在检出代码执行用户发布前命令")
 	commands := parseCommands(t.model.Project.PostDeploy)
 	for _, cmd := range commands {
 		cmd = fmt.Sprintf("cd %s && %s", t.deployDirs.localWarehouseDir, cmd)
 		r := t.newRecordLocal(cmd, t.envs())
-		if err := r.Run(t.ctx); err != nil {
+		if err := r.Run(ctx); err != nil {
 			return err
 		}
 	}
 	//2、打包代码
-	st := time.Now()
+	t.log.Debug("3.2、打包代码")
 	cmd := fmt.Sprintf("tar -zcvf %s -C %s", t.deployDirs.localCodePackage, t.deployDirs.localWarehouseDir)
 	record := t.newRecordLocal(cmd, nil)
+	record.SetSaveTime()
 	err := compress.PackMatch(t.deployDirs.localCodePackage, t.deployDirs.localWarehouseDir, t.getFileMatch())
 	if err != nil {
-		_err := "打包代码出错:" + err.Error()
-		_ = record.Save(254, &_err, time.Since(st).Milliseconds())
+		_ = record.Save(254, "打包代码出错:"+err.Error())
 		return err
 	}
-	_err := "success"
-	_ = record.Save(0, &_err, time.Since(st).Milliseconds())
+	_ = record.Save(0, "success")
 	return nil
 }
 
-func (t *Task) remoteRelease() error {
-	remoteErrs := make(RemoteErrs)
+func (t *Task) remoteRelease(ctx context.Context) error {
+	remoteErrs := RemoteErrs{}
 	wg := sync.WaitGroup{}
 	for _, s := range t.model.Servers {
 		wg.Add(1)
-		go func(server *model.Server) {
-			remoteErrs[server.ID] = t.remoteRun(server)
+		go func(server model.Server) {
+			remoteErrs.Store(server.ID, t.remoteRun(ctx, &server))
 			wg.Done()
 		}(s)
 	}
@@ -245,13 +245,13 @@ func (t *Task) remoteRelease() error {
 }
 
 // remoteRun 远程服务器执行部署
-func (t *Task) remoteRun(server *model.Server) error {
-	for _, f := range []func(server *model.Server) error{t.prevRelease, t.release, t.postRelease} {
+func (t *Task) remoteRun(ctx context.Context, server *model.Server) error {
+	for _, f := range []func(ctx2 context.Context, server *model.Server) error{t.prevRelease, t.release, t.postRelease} {
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			return ErrStopDeploy
 		default:
-			if err := f(server); err != nil {
+			if err := f(ctx, server); err != nil {
 				return err
 			}
 		}
@@ -260,7 +260,7 @@ func (t *Task) remoteRun(server *model.Server) error {
 }
 
 // prevRelease step4.推送代码到服务器前的操作
-func (t *Task) prevRelease(server *model.Server) error {
+func (t *Task) prevRelease(ctx context.Context, server *model.Server) error {
 	//解压程序包
 	//_tarCmd := fmt.Sprintf("mkdir -p %s ", filepath.Dir(t.deployDirs.remoteReleasePackage))
 	//r := NewRecord(model.RecordTypePrevRelease, t.model.ID, t.userId, _tarCmd, server, t.envs())
@@ -268,33 +268,35 @@ func (t *Task) prevRelease(server *model.Server) error {
 	//	return err
 	//}
 	//1、上传程序包
-	st := time.Now()
-	_saveCmd := fmt.Sprintf("scp -P%d %s@%s:%s %s:%s", server.Port, currentUser.Username, currentHost, t.deployDirs.localCodePackage, server.Hostname(), t.deployDirs.remoteReleasePackage)
-	record := t.newRecordLocal(_saveCmd, nil)
-	sftp, err := global.Ssh.NewSftp(ssh.ServerConfig{Host: server.Host, User: server.User, Port: server.Port})
+	t.log.Debug("4.1、上传程序包", zap.String("server", server.Hostname()))
+	_saveCmd := fmt.Sprintf("scp -P%d %s@%s:%s %s:%s", server.Port, utils.CurrentUser.Username, utils.CurrentHostname, t.deployDirs.localCodePackage, server.Hostname(), t.deployDirs.remoteReleasePackage)
+	record := t.newRecordRemote(_saveCmd, server, nil)
+	record.SetSaveTime()
+	sftp, err := t.ssh.NewSftp(ssh.ServerConfig{Host: server.Host, User: server.User, Port: server.Port})
 	if err == nil {
 		err = sftp.Copy(t.deployDirs.localCodePackage, t.deployDirs.remoteReleasePackage)
+		sftp.Close()
 	}
 	if err != nil {
-		_err := "上传程序出错:" + err.Error()
-		_ = record.Save(254, &_err, time.Since(st).Milliseconds())
+		_ = record.Save(254, "上传程序出错:"+err.Error())
 		return err
 	}
-	_err := "success"
-	_ = record.Save(0, &_err, time.Since(st).Milliseconds())
+	_ = record.Save(0, "success")
 
 	//2、解压程序包
+	t.log.Debug("4.2、在服务器解压程序包", zap.String("server", server.Hostname()))
 	_tarCmd := fmt.Sprintf("mkdir -p %s && tar -zxvf %s -C %s", t.deployDirs.remoteReleaseDir, t.deployDirs.remoteReleasePackage, t.deployDirs.remoteReleaseDir)
 	r := t.newRecordRemote(_tarCmd, server, t.envs())
-	if err = r.Run(t.ctx); err != nil {
+	if err = r.Run(ctx); err != nil {
 		return err
 	}
 	//3、执行用户命令
+	t.log.Debug("4.3、执行用户命令", zap.String("server", server.Hostname()))
 	commands := parseCommands(t.model.Project.PrevRelease)
 	for _, cmd := range commands {
 		cmd = fmt.Sprintf("cd %s && %s", t.deployDirs.remoteReleaseDir, cmd)
 		r = t.newRecordRemote(cmd, server, t.envs())
-		if err = r.Run(t.ctx); err != nil {
+		if err = r.Run(ctx); err != nil {
 			return err
 		}
 	}
@@ -302,26 +304,29 @@ func (t *Task) prevRelease(server *model.Server) error {
 }
 
 // release step5.部署程序
-func (t *Task) release(server *model.Server) error {
+func (t *Task) release(ctx context.Context, server *model.Server) error {
 	//1、获取上一个部署版本，保存下来
+	t.log.Debug("5.1、获取上一个部署版本，保存下来", zap.String("server", server.Hostname()))
 	cmd := fmt.Sprintf("[ -L %s ] && readlink %s || echo \"\"", t.deployDirs.remoteRootLink, t.deployDirs.remoteRootLink)
 	record := t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(t.ctx); err != nil {
+	if err := record.Run(ctx); err != nil {
 		return err
 	}
 	t.model.PrevVersion = record.Output()
 
 	//2、部署代码，创建并替换源软连接
+	t.log.Debug("5.2、部署代码，创建并替换源软连接", zap.String("server", server.Hostname()))
 	tmpLink := fmt.Sprintf("%s_tmp", t.deployDirs.remoteRootLink)
 	cmd = fmt.Sprintf("mkdir -p %s && ln -sfn %s %s", filepath.Dir(t.deployDirs.remoteRootLink), t.deployDirs.remoteReleaseDir, tmpLink)
 	record = t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(t.ctx); err != nil {
+	if err := record.Run(ctx); err != nil {
 		return err
 	}
 
+	t.log.Debug("5.3、更新数据库记录", zap.String("server", server.Hostname()))
 	cmd = fmt.Sprintf("mv -fT %s %s", tmpLink, t.deployDirs.remoteRootLink)
 	record = t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(t.ctx); err != nil {
+	if err := record.Run(ctx); err != nil {
 		return err
 	}
 	t.db.Select("prev_version").UpdateColumns(t.model)
@@ -329,57 +334,47 @@ func (t *Task) release(server *model.Server) error {
 }
 
 // postRelease 6、执行部署完成功后用户相关命令
-func (t *Task) postRelease(server *model.Server) error {
+func (t *Task) postRelease(ctx context.Context, server *model.Server) error {
+	t.log.Debug("6.1、执行部署完成功后用户相关命令", zap.String("server", server.Hostname()))
 	commands := parseCommands(t.model.Project.PostRelease)
 	for _, cmd := range commands {
 		cmd = fmt.Sprintf("cd %s && %s", t.deployDirs.remoteRootLink, cmd)
 		r := t.newRecordRemote(cmd, server, t.envs())
-		if err := r.Run(t.ctx); err != nil {
+		if err := r.Run(ctx); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *Task) start() {
+func (t *Task) start(ctx context.Context) {
 	var err error
 loopFor:
-	for _, f := range []func() error{t.prevDeploy, t.deploy, t.postDeploy, t.remoteRelease} {
+	for _, f := range []func(ctx2 context.Context) error{t.prevDeploy, t.deploy, t.postDeploy, t.remoteRelease} {
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			err = ErrStopDeploy
 			break loopFor
 		default:
-			err = f()
+			err = f(ctx)
+			fmt.Println("start", err)
 			if err != nil {
 				break loopFor
 			}
 		}
 	}
+	fmt.Println("over")
 	t.doneError <- err
+	fmt.Println("over", err)
 }
 
-func (t *Task) Stop() error {
-	if t.started {
-		if t.cancel != nil {
-			t.cancel()
-			t.cancel = nil
-		}
-	}
-	return nil
-}
-
-type Msg struct {
-	ServerId int64  `json:"server_id"`
-	Data     []byte `json:"data"`
-}
-
-func (t *Task) Output(ctx context.Context) <-chan Msg {
-	msg := make(chan Msg, len(t.model.Servers))
+// Output 发布日志即时输出
+func (t *Task) Output(ctx context.Context) <-chan *ConsoleMsg {
+	msg := make(chan *ConsoleMsg, len(t.model.Servers))
 	go func() {
 		defer close(msg)
 		offsetMap := make(map[int64]int)
-		for k, _ := range t.taskLogs {
+		for k := range t.taskLogs {
 			offsetMap[k] = 0
 		}
 		for {
@@ -389,12 +384,14 @@ func (t *Task) Output(ctx context.Context) <-chan Msg {
 			default:
 			}
 			for k, off := range offsetMap {
-				_data := make([]byte, 1024)
+				_data := make([]byte, 10)
 				n, err := t.taskLogs[k].ReadAt(_data, off)
+				offsetMap[k] += n
+				_data = _data[:n]
 				if n > 0 {
-					msg <- Msg{
+					msg <- &ConsoleMsg{
 						ServerId: k,
-						Data:     _data,
+						Data:     string(_data),
 					}
 				}
 				if errors.Is(err, io.EOF) {
@@ -403,6 +400,8 @@ func (t *Task) Output(ctx context.Context) <-chan Msg {
 			}
 			if len(offsetMap) == 0 {
 				break
+			} else {
+				time.Sleep(time.Second / 50)
 			}
 		}
 	}()
@@ -412,6 +411,10 @@ func (t *Task) Output(ctx context.Context) <-chan Msg {
 func (t *Task) Wait() error {
 	doneErr := <-t.doneError
 	close(t.doneError)
+	fmt.Println("t.doneError", t.doneError)
+	for i := range t.taskLogs {
+		t.taskLogs[i].WriteOver()
+	}
 
 	t.model.Status = model.TaskStatusFinish
 	if doneErr != nil {
@@ -425,13 +428,13 @@ func (t *Task) Wait() error {
 	}
 	mb, _ := json.Marshal(t.model)
 
-	//if t.deployDirs.localCodePackage != "" {
-	//	_ = os.RemoveAll(t.deployDirs.localCodePackage)
-	//	_ = os.RemoveAll(t.deployDirs.localWarehouseDir)
-	//}
+	err := t.deployDirs.Remove()
+	if err != nil {
+		t.log.Error("发布完成移除临时文件目录出错", zap.Error(err), zap.Object("deployDirs", t.deployDirs))
+	}
 
-	if err := t.db.Model(model.Task{}).
-		Select("status", "last_error").UpdateColumns(t.model).Error; err != nil {
+	if err = t.db.Model(model.Task{}).
+		Select("status", "last_error").Where("id = ?", t.model.ID).UpdateColumns(t.model).Error; err != nil {
 		t.log.Error("部署完成，更新数据库时出错", zap.ByteString("task_model", mb), zap.Error(doneErr), zap.Error(err))
 	} else {
 		t.log.Debug("部署完成", zap.ByteString("task_model", mb))
@@ -452,11 +455,20 @@ func (t *Task) envs() *ssh.Envs {
 }
 
 func (t *Task) getFileMatch() compress.Match {
-	regs := strings.Split(t.model.Project.Excludes, "\n")
-	if len(regs) > 0 {
-		regs = slices.Map(regs, func(item string, k int) string {
-			return strings.TrimSpace(item)
-		})
+	_files := strings.TrimSpace(t.model.Project.Excludes)
+	if _files != "" {
+		regs := make([]string, 0)
+		for _, v := range strings.Split(_files, "\n") {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				regs = append(regs, v)
+			}
+		}
+		fmt.Println("regs", regs)
+		if len(regs) == 0 {
+			return nil
+		}
+
 		if t.model.Project.IsInclude == model.ProjectIsInclude {
 			return compress.FileMatch(regs...)
 		}
@@ -466,17 +478,25 @@ func (t *Task) getFileMatch() compress.Match {
 }
 
 func (t *Task) getRepo() (repo.Repo, error) {
-	return global.Repo.New(repo.TypeRepo(t.model.Project.RepoType), t.model.Project.RepoUrl, fmt.Sprintf("%d", t.model.Project.ID))
+	return t.repo.New(repo.TypeRepo(t.model.Project.RepoType), t.model.Project.RepoUrl, fmt.Sprintf("%d", t.model.Project.ID))
 }
 
 func (t *Task) newRecordLocal(cmd string, envs *ssh.Envs) *Record {
-	t.taskLogs[localServerId].Write([]byte(localSshSym))
-	return NewRecordLocal(t.db, t.log, t.model.ID, t.userId, cmd, envs, t.taskLogs[localServerId])
+	fmt.Println("newRecordLocal", cmd)
+	t.taskLogs[localServerId].Write([]byte(utils.CurrentHost + " $ " + cmd + "\r\n"))
+	if envs == nil {
+		envs = ssh.NewEnvs()
+	}
+	return NewRecordLocal(t.db, t.log, t.ssh, t.model.ID, t.userId, cmd, envs, t.taskLogs[localServerId])
 }
 
 func (t *Task) newRecordRemote(cmd string, server *model.Server, envs *ssh.Envs) *Record {
-	t.taskLogs[server.ID].Write([]byte(server.Hostname()))
-	return NewRecordRemote(t.db, t.log, t.model.ID, t.userId, cmd, server, envs, t.taskLogs[server.ID])
+	fmt.Println("newRecordRemote", cmd)
+	t.taskLogs[server.ID].Write([]byte(server.Hostname() + " $ " + cmd + "\r\n"))
+	if envs == nil {
+		envs = ssh.NewEnvs()
+	}
+	return NewRecordRemote(t.db, t.log, t.ssh, t.model.ID, t.userId, cmd, server, envs, t.taskLogs[server.ID])
 }
 
 func (t *Task) createReleaseVersion() string {
