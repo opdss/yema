@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/wuzfei/go-helper/rand"
+	"github.com/wuzfei/go-helper/slices"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -11,6 +12,8 @@ import (
 	"yema.dev/app/model"
 	"yema.dev/app/model/field"
 )
+
+const defaultPwd = "123456"
 
 type Config struct {
 	Account  string `help:"超级管理员名称" default:"admin"`
@@ -32,16 +35,7 @@ func NewMigration(conf *Config, log *zap.Logger, db *gorm.DB) *Migration {
 	}
 }
 
-func (m *Migration) Setup() error {
-	err := m.createTables()
-	if err != nil {
-		m.log.Error("创建表失败", zap.Error(err))
-		return err
-	}
-	return m.initAdminAccount()
-}
-
-func (m *Migration) createTables() error {
+func (m *Migration) InitTables() error {
 	return m.db.AutoMigrate(
 		&model.User{},
 		&model.Server{},
@@ -51,11 +45,12 @@ func (m *Migration) createTables() error {
 		&model.Member{},
 		&model.Record{},
 		&model.Task{},
+		&model.TaskServer{},
 	)
 }
 
-// initAdmin 初始化超管账户
-func (m *Migration) initAdminAccount() error {
+// InitAdminAccount 初始化超管账户
+func (m *Migration) InitAdminAccount() error {
 	mUser := model.User{
 		ID:       model.SuperUserId,
 		Username: "admin",
@@ -92,4 +87,36 @@ func (m *Migration) initAdminAccount() error {
 	}
 	m.log.Info(fmt.Sprintf("初始化超级管理员[%s]账户成功，账号：%s, 密码：%s,请及时修改", mUser.Username, mUser.Email, pwd))
 	return nil
+}
+
+// MockDefaultData 创建一些默认数据
+func (m *Migration) MockDefaultData() error {
+	pwd, _ := bcrypt.GenerateFromPassword([]byte(defaultPwd), bcrypt.DefaultCost)
+	var ownerUser *model.User
+	users := slices.Map([]string{"owner", "master", "developer"}, func(v string, k int) *model.User {
+		u := &model.User{
+			Username: v,
+			Email:    v + "@yema.dev",
+			Password: pwd,
+			Status:   field.StatusEnable,
+		}
+		if v == "owner" {
+			ownerUser = u
+		}
+		return u
+	})
+	space := model.Space{
+		Status: field.StatusEnable,
+		Name:   "DEMO",
+	}
+
+	return m.db.Transaction(func(tx *gorm.DB) error {
+		err := tx.Create(&users).Error
+		if err != nil {
+			return err
+		}
+		space.UserId = ownerUser.ID
+		return tx.Create(&space).Error
+	})
+
 }

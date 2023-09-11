@@ -47,7 +47,6 @@
   import { useI18n } from '/@/hooks/web/useI18n';
   import { useDesign } from '/@/hooks/web/useDesign';
   import { useModal } from '/@/components/Modal';
-
   import { propTypes } from '/@/utils/propTypes';
   import { openWindow } from '/@/utils';
 
@@ -74,7 +73,7 @@
       const userStore = useUserStore();
 
       const getUserInfo = computed(() => {
-        const { username, desc = "" } = userStore.getUserInfo || {};
+        const { username, desc = '' } = userStore.getUserInfo || {};
         return { username, desc };
       });
 
@@ -124,13 +123,13 @@
   @prefix-cls: ~'@{namespace}-header-user-dropdown';
 
   .@{prefix-cls} {
+    align-items: center;
     height: @header-height;
     padding: 0 0 0 10px;
     padding-right: 10px;
     overflow: hidden;
     font-size: 12px;
     cursor: pointer;
-    align-items: center;
 
     img {
       width: 24px;

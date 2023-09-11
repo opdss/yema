@@ -1,7 +1,7 @@
 // axios配置  可自行根据项目进行更改，只需更改该文件即可，其他文件可以不动
 // The axios configuration can be changed according to the project, just change the file, other files can be left unchanged
 
-import type { AxiosResponse } from 'axios';
+import type { AxiosResponse, AxiosInstance } from 'axios';
 import { clone } from 'lodash-es';
 import type { RequestOptions, Result } from '/#/axios';
 import type { AxiosTransform, CreateAxiosOptions } from './axiosTransform';
@@ -161,7 +161,7 @@ const transform: AxiosTransform = {
       (config as Recordable).headers.Authorization = options.authenticationScheme
         ? `${options.authenticationScheme} ${token}`
         : token;
-      (config as Recordable).headers["Space-Id"] = getSpaceId()
+      (config as Recordable).headers['Space-Id'] = getSpaceId();
     }
     return config;
   },
@@ -176,7 +176,7 @@ const transform: AxiosTransform = {
   /**
    * @description: 响应错误处理
    */
-  responseInterceptorsCatch:async (axiosInstance: AxiosResponse, error: any) => {
+  responseInterceptorsCatch: (axiosInstance: AxiosInstance, error: any) => {
     const { t } = useI18n();
     const errorLogStore = useErrorLogStoreWithOut();
     errorLogStore.addAjaxErrorInfo(error);
@@ -210,17 +210,16 @@ const transform: AxiosTransform = {
       throw new Error(error as unknown as string);
     }
 
-    await checkStatus(error?.response?.status, msg, errorMessageMode).then((e)=>{
-      // 添加自动重试机制 保险起见 只针对GET请求
-      const retryRequest = new AxiosRetry();
-      const { isOpenRetry } = config.requestOptions.retryRequest;
-      (e === true || (config.method?.toUpperCase() === RequestEnum.GET && isOpenRetry))  &&
+    checkStatus(error?.response?.status, msg, errorMessageMode);
+
+    // 添加自动重试机制 保险起见 只针对GET请求
+    const retryRequest = new AxiosRetry();
+    const { isOpenRetry } = config.requestOptions.retryRequest;
+    config.method?.toUpperCase() === RequestEnum.GET &&
+      isOpenRetry &&
       // @ts-ignore
       retryRequest.retry(axiosInstance, error);
-    }).finally(()=>{
-      return Promise.reject(error);
-    })
-
+    return Promise.reject(error);
   },
 };
 
@@ -268,7 +267,7 @@ function createAxios(opt?: Partial<CreateAxiosOptions>) {
           withToken: true,
           retryRequest: {
             isOpenRetry: true,
-            count: 1,
+            count: 5,
             waitTime: 100,
           },
         },

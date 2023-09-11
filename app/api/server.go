@@ -19,7 +19,7 @@ import (
 )
 
 type Config struct {
-	BaseUrl string `help:"访问地址" devDefault:"http://localhost:8989" default:"http://localhost:9000"`
+	BaseUrl string `help:"访问地址" devDefault:"http://localhost:8989/" default:"http://localhost:9000"`
 	Address string `help:"监听地址" devDefault:"0.0.0.0:8989" default:"0.0.0.0:9000"`
 }
 

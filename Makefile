@@ -54,12 +54,12 @@ build-web-deps: ## 安装web依赖包
 
 .PHONY: web
 web: ## 编译构建web
-	cd web && npm ci --registry https://registry.npm.taobao.org && npm run build
+	cd web && pnpm install --registry https://registry.npm.taobao.org && pnpm run build
 
 .PHONY: backend
 backend: ## 编译构建api
 	@echo "Running ${@}"
-	./scripts/release.sh build main.go
+	./script/release.sh build main.go
 
 .PHONY: install
 install: web backend ## 编译构建本项目,先构建web，再构建api

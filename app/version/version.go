@@ -30,7 +30,11 @@ type build struct {
 }
 
 func (n build) String() string {
-	return fmt.Sprintf("Release version：%s(%s);Release time：%s", n.Version, n.CommitHash, n.Timestamp)
+	if n.Release {
+		return fmt.Sprintf("Release version：%s(commit:%s);Release time：%s", n.Version, n.CommitHash, n.Timestamp)
+	} else {
+		return fmt.Sprintf("Non-release version(commit:%s):%s", n.CommitHash, n.Timestamp)
+	}
 }
 
 func buildInfo() build {

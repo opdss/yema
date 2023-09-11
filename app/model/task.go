@@ -6,12 +6,13 @@ import (
 )
 
 const (
-	TaskStatusWaiting     = 1 //新建提交，等待审核
-	TaskStatusAudit       = 2 //审核通过
-	TaskStatusReject      = 3 //审核拒绝
-	TaskStatusRelease     = 4 //上线发布中
-	TaskStatusReleaseFail = 5 //上线失败
-	TaskStatusFinish      = 6 //上线完成
+	TaskStatusWaiting         = 1 //新建提交，等待审核
+	TaskStatusAudit           = 2 //审核通过
+	TaskStatusReject          = 3 //审核拒绝
+	TaskStatusRelease         = 4 //上线发布中
+	TaskStatusReleaseFail     = 5 //上线失败
+	TaskStatusReleasePartFail = 6 //部分服务器失败
+	TaskStatusFinish          = 7 //上线完成
 )
 
 type Task struct {

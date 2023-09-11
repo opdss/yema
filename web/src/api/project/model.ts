@@ -1,5 +1,5 @@
-import { BasicPageParams, BasicFetchResult } from '/@/api/model/baseModel';
-import {ListItem as serverListItem} from '/@/api/server/model'
+import { BasicPageParams, BasicFetchResult } from '../baseModel';
+import { ListItem as serverListItem } from '/@/api/server/model';
 
 export type ListReq = BasicPageParams & {
   name?: string;
@@ -11,7 +11,7 @@ export interface CreateReq {
   environment_id: number;
   repo_url: string;
   repo_mode: string;
-  repo_type:string;
+  repo_type: string;
   task_audit: number;
   description: string;
 
@@ -21,14 +21,13 @@ export interface CreateReq {
   target_releases: string;
   keep_version_num: number;
 
-  excludes : string;
+  excludes: string;
   is_include: number;
-  task_vars : string;
-  prev_deploy : string;
-  post_deploy : string;
-  prev_release : string;
-  post_release : string;
-
+  task_vars: string;
+  prev_deploy: string;
+  post_deploy: string;
+  prev_release: string;
+  post_release: string;
 }
 
 export interface UpdateReq extends CreateReq {
@@ -41,29 +40,29 @@ export interface Detail {
   environment_id: number;
   repo_url: string;
   repo_mode: string;
-  repo_type:string;
+  repo_type: string;
   task_audit: number;
   description: string;
 
-  servers:serverListItem[];
+  servers: serverListItem[];
 
   target_root: string;
   target_releases: string;
   keep_version_num: number;
 
-  excludes : string;
+  excludes: string;
   is_include: number;
-  task_vars : string;
-  prev_deploy : string;
-  post_deploy : string;
-  prev_release : string;
-  post_release : string;
+  task_vars: string;
+  prev_deploy: string;
+  post_deploy: string;
+  prev_release: string;
+  post_release: string;
 
-  server_ids: number[],
+  server_ids: number[];
   space: string;
   environment: number;
   created_at: string;
-  [key: string] : any
+  [key: string]: any;
 }
 
 export interface ListItem {
@@ -73,20 +72,26 @@ export interface ListItem {
   environment: number;
   description: string;
   created_at: string;
-  [key: string] : any
+  [key: string]: any;
 }
 
 export type ListItemRes = BasicFetchResult<ListItem>;
 
-
 export type TagItems = {
-  name: string,
-  hash: string,
-}
+  name: string;
+  hash: string;
+};
 
-export type BranchItems = TagItems
+export type BranchItems = TagItems;
 
 export type CommitItems = TagItems & {
-  timestamp: string,
-  message: string,
+  timestamp: string;
+  message: string;
+};
+
+export interface DetectionInfoItem {
+  server_id: number;
+  title: string;
+  error: string;
+  todo: string;
 }

@@ -5,6 +5,7 @@
   import { BasicMenu } from '/@/components/Menu';
   import { SimpleMenu } from '/@/components/SimpleMenu';
   import { AppLogo } from '/@/components/Application';
+  import Version from './Version.vue';
 
   import { MenuModeEnum, MenuSplitTyeEnum } from '/@/enums/menuEnum';
 
@@ -33,7 +34,7 @@
       isHorizontal: propTypes.bool,
       // menu Mode
       menuMode: {
-        type: [String] as PropType<Nullable<MenuModeEnum>>,
+        type: [String] as PropType<MenuModeEnum | null>,
         default: '',
       },
     },
@@ -143,7 +144,10 @@
         // console.log(menus);
         if (!menus || !menus.length) return null;
         return !props.isHorizontal ? (
-          <SimpleMenu {...menuProps} isSplitMenu={unref(getSplit)} items={menus} />
+          <div>
+            <SimpleMenu {...menuProps} isSplitMenu={unref(getSplit)} items={menus} />
+            <Version collapse={menuProps.collapse} />
+          </div>
         ) : (
           <BasicMenu
             {...(menuProps as any)}
@@ -189,7 +193,7 @@
     &--mobile {
       .@{logo-prefix-cls} {
         &__title {
-          opacity: 100%;
+          opacity: 1;
         }
       }
     }

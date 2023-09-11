@@ -29,6 +29,20 @@ type AuditReq struct {
 }
 
 type ConsoleMsg struct {
+	Step     int8   `json:"step"`
+	Status   int8   `json:"status"`
 	ServerId int64  `json:"server_id"`
 	Data     string `json:"data"`
 }
+
+const (
+	outputTypeMsg  = 0
+	outputTypeStep = 1
+
+	step1 = 1
+	step2 = 2
+	step3 = 3
+	step4 = 4
+	step5 = 5
+	step6 = 6
+)

@@ -13,7 +13,6 @@ import projectSetting from '/@/settings/projectSetting';
 import { PermissionModeEnum } from '/@/enums/appEnum';
 
 import { asyncRoutes } from '/@/router/routes';
-import { ERROR_LOG_ROUTE } from '/@/router/routes/basic';
 
 import { filter } from '/@/utils/helper/treeHelper';
 
@@ -55,21 +54,20 @@ export const usePermissionStore = defineStore({
     frontMenuList: [],
   }),
   getters: {
-    getBackMenuList(): Menu[] {
-      return this.backMenuList;
+    getBackMenuList(state): Menu[] {
+      return state.backMenuList;
     },
-    getFrontMenuList(): Menu[] {
-      return this.frontMenuList;
+    getFrontMenuList(state): Menu[] {
+      return state.frontMenuList;
     },
-    getLastBuildMenuTime(): number {
-      return this.lastBuildMenuTime;
+    getLastBuildMenuTime(state): number {
+      return state.lastBuildMenuTime;
     },
-    getIsDynamicAddedRoute(): boolean {
-      return this.isDynamicAddedRoute;
+    getIsDynamicAddedRoute(state): boolean {
+      return state.isDynamicAddedRoute;
     },
   },
   actions: {
-
     setBackMenuList(list: Menu[]) {
       this.backMenuList = list;
       list?.length > 0 && this.setLastBuildMenuTime();
@@ -91,8 +89,6 @@ export const usePermissionStore = defineStore({
       this.permCodeList = [];
       this.backMenuList = [];
       this.lastBuildMenuTime = 0;
-    },
-    async changePermissionCode() {
     },
 
     // 构建路由
@@ -190,9 +186,49 @@ export const usePermissionStore = defineStore({
           // 将多级路由转换为 2 级路由
           routes = flatMultiLevelRoutes(routes);
           break;
+
+        //  If you are sure that you do not need to do background dynamic permissions, please comment the entire judgment below
+        //  如果确定不需要做后台动态权限，请在下方注释整个判断
+        // case PermissionModeEnum.BACK:
+        //   const { createMessage } = useMessage();
+
+        //   createMessage.loading({
+        //     content: t('sys.app.menuLoading'),
+        //     duration: 1,
+        //   });
+
+        //   // !Simulate to obtain permission codes from the background,
+        //   // 模拟从后台获取权限码，
+        //   // this function may only need to be executed once, and the actual project can be put at the right time by itself
+        //   // 这个功能可能只需要执行一次，实际项目可以自己放在合适的时间
+        //   let routeList: AppRouteRecordRaw[] = [];
+        //   try {
+        //     await this.changePermissionCode();
+        //     routeList = (await getMenuList()) as AppRouteRecordRaw[];
+        //   } catch (error) {
+        //     console.error(error);
+        //   }
+
+        //   // Dynamically introduce components
+        //   // 动态引入组件
+        //   routeList = transformObjToRoute(routeList);
+
+        //   //  Background routing to menu structure
+        //   //  后台路由到菜单结构
+        //   const backMenuList = transformRouteToMenu(routeList);
+        //   this.setBackMenuList(backMenuList);
+
+        //   // remove meta.ignoreRoute item
+        //   // 删除 meta.ignoreRoute 项
+        //   routeList = filter(routeList, routeRemoveIgnoreFilter);
+        //   routeList = routeList.filter(routeRemoveIgnoreFilter);
+
+        //   routeList = flatMultiLevelRoutes(routeList);
+        //   routes = [PAGE_NOT_FOUND_ROUTE, ...routeList];
+        //   break;
       }
 
-      routes.push(ERROR_LOG_ROUTE);
+      //routes.push(ERROR_LOG_ROUTE);
       patchHomeAffix(routes);
       return routes;
     },

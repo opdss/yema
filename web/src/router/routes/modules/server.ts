@@ -30,7 +30,7 @@ const server: AppRouteModule = {
       name: 'ServerTerminal',
       component: () => import('/@/views/server/terminal.vue'),
       meta: {
-        title: "终端",
+        title: '终端',
         icon: 'ant-design:hdd-outlined',
         hideMenu: true,
       },

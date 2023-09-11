@@ -25,6 +25,7 @@ type Record struct {
 	Status   int                  `gorm:"column:status;notNull;default:0;comment:执行状态,linux退出码" json:"status"`
 	Command  string               `gorm:"column:command;notNull;default:'';comment:执行命令" json:"command"`
 	Output   string               `gorm:"column:output;notNull;default:'';comment:输出结果" json:"output"`
+	Step     int8                 `gorm:"column:step;notNull;default:0;comment:流程步骤" json:"step"`
 
 	Server Server `json:"server"`
 

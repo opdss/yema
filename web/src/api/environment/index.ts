@@ -1,11 +1,6 @@
-import {
-  ListReq,
-  CreateReq,
-  UpdateReq,
-  ListItemRes
-} from './model';
+import { ListReq, CreateReq, UpdateReq, ListItemRes } from './model';
 import { defHttp } from '/@/utils/http/axios';
-import {GetOptionItemsModel} from "../model/baseModel";
+import { GetOptionItemsModel } from '../baseModel';
 
 enum Api {
   Environment = '/environment',
@@ -17,8 +12,7 @@ export const getEnvironmentListByPage = (params?: ListReq) =>
   defHttp.get<ListItemRes>({ url: Api.Environment, params });
 
 export const createEnvironment = (params: CreateReq) =>
-  defHttp.post({url: Api.Environment, params: params});
-
+  defHttp.post({ url: Api.Environment, params: params });
 
 export const updateEnvironment = (params: UpdateReq) =>
   defHttp.put({ url: Api.Environment, params: params });

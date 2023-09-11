@@ -30,8 +30,7 @@ const environment: AppRouteModule = {
       name: 'ProjectCreate',
       component: () => import('/@/views/project/form.vue'),
       meta: {
-        title: t('routes.basic.project'),
-        icon: 'ant-design:database-outlined',
+        title: '创建项目',
         hideMenu: true,
       },
     },
@@ -40,18 +39,16 @@ const environment: AppRouteModule = {
       name: 'ProjectUpdate',
       component: () => import('/@/views/project/form.vue'),
       meta: {
-        title: t('routes.basic.project'),
-        icon: 'ant-design:database-outlined',
+        title: '修改项目信息',
         hideMenu: true,
       },
     },
     {
       path: 'detail/:id',
       name: 'ProjectDetail',
-      component: () => import('/@/views/project/form.vue'),
+      component: () => import('/@/views/project/detail.vue'),
       meta: {
-        title: t('routes.basic.project'),
-        icon: 'ant-design:database-outlined',
+        title: '项目详情',
         hideMenu: true,
       },
     },

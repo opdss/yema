@@ -1,29 +1,28 @@
-import type {UserInfo} from '/#/store';
-import type {ErrorMessageMode} from '/#/axios';
-import {defineStore} from 'pinia';
-import {store} from '/@/store';
-import {RoleEnum} from '/@/enums/roleEnum';
-import {PageEnum} from '/@/enums/pageEnum';
+import type { UserInfo } from '/#/store';
+import type { ErrorMessageMode } from '/#/axios';
+import { defineStore } from 'pinia';
+import { store } from '/@/store';
+import { RoleEnum } from '/@/enums/roleEnum';
+import { PageEnum } from '/@/enums/pageEnum';
 import {
+  ROLES_KEY,
+  TOKEN_KEY,
+  USER_INFO_KEY,
   CURRENT_SPACE_ID_KEY,
   REFRESH_TOKEN_KEY,
   ROLE_KEY,
-  ROLES_KEY,
   SPACES_KEY,
-  TOKEN_KEY,
-  USER_INFO_KEY
 } from '/@/enums/cacheEnum';
-import {getAuthCache, setAuthCache} from '/@/utils/auth';
-import {GetUserInfoModel, LoginParams, SpaceInfo} from '/@/api/user/model';
-import {doLogout, getUserInfo, loginApi, refreshToken} from '/@/api/user';
-import {useI18n} from '/@/hooks/web/useI18n';
-import {useMessage} from '/@/hooks/web/useMessage';
-import {router} from '/@/router';
-import {usePermissionStore} from '/@/store/modules/permission';
-import {RouteRecordRaw} from 'vue-router';
-import {PAGE_NOT_FOUND_ROUTE} from '/@/router/routes/basic';
-// import {isArray} from '/@/utils/is';
-import {h} from 'vue';
+import { getAuthCache, setAuthCache } from '/@/utils/auth';
+import { GetUserInfoModel, LoginParams, SpaceInfo } from '/@/api/login/model';
+import { doLogout, getUserInfo, loginApi, refreshToken } from '/@/api/login';
+import { useI18n } from '/@/hooks/web/useI18n';
+import { useMessage } from '/@/hooks/web/useMessage';
+import { router } from '/@/router';
+import { usePermissionStore } from '/@/store/modules/permission';
+import { RouteRecordRaw } from 'vue-router';
+import { PAGE_NOT_FOUND_ROUTE } from '/@/router/routes/basic';
+import { h } from 'vue';
 
 interface UserState {
   userInfo: Nullable<UserInfo>;
@@ -34,7 +33,7 @@ interface UserState {
   lastUpdateTime: number;
   role: string;
   currentSpaceId: number;
-  spaces:SpaceInfo[];
+  spaces: SpaceInfo[];
 }
 
 export const useUserStore = defineStore({
@@ -51,37 +50,37 @@ export const useUserStore = defineStore({
     sessionTimeout: false,
     // Last fetch time
     lastUpdateTime: 0,
-    role: "",
+    role: '',
     currentSpaceId: 0,
-    spaces:[],
+    spaces: [],
   }),
   getters: {
-    getUserInfo(): UserInfo {
-      return this.userInfo || getAuthCache<UserInfo>(USER_INFO_KEY) || {};
+    getUserInfo(state): UserInfo {
+      return state.userInfo || getAuthCache<UserInfo>(USER_INFO_KEY) || {};
     },
-    getToken(): string {
-      return this.token || getAuthCache<string>(TOKEN_KEY);
+    getToken(state): string {
+      return state.token || getAuthCache<string>(TOKEN_KEY);
     },
-    getRefreshToken(): string {
-      return this.refreshToken || getAuthCache<string>(REFRESH_TOKEN_KEY);
+    getRefreshToken(state): string {
+      return state.refreshToken || getAuthCache<string>(REFRESH_TOKEN_KEY);
     },
-    getRoleList(): RoleEnum[] {
-      return this.roleList.length > 0 ? this.roleList : getAuthCache<RoleEnum[]>(ROLES_KEY);
+    getRoleList(state): RoleEnum[] {
+      return state.roleList.length > 0 ? state.roleList : getAuthCache<RoleEnum[]>(ROLES_KEY);
     },
-    getSessionTimeout(): boolean {
-      return !!this.sessionTimeout;
+    getSessionTimeout(state): boolean {
+      return !!state.sessionTimeout;
     },
-    getLastUpdateTime(): number {
-      return this.lastUpdateTime;
+    getLastUpdateTime(state): number {
+      return state.lastUpdateTime;
     },
-    getRole(): string {
-      return this.role || getAuthCache<string>(ROLE_KEY);
+    getRole(state): string {
+      return state.role || getAuthCache<string>(ROLE_KEY);
     },
-    getCurrentSpaceId(): number {
-      return this.currentSpaceId || getAuthCache<number>(CURRENT_SPACE_ID_KEY);
+    getCurrentSpaceId(state): number {
+      return state.currentSpaceId || getAuthCache<number>(CURRENT_SPACE_ID_KEY);
     },
-    getSpaces(): SpaceInfo[] {
-      return this.spaces || getAuthCache<SpaceInfo[]>(SPACES_KEY) || [];
+    getSpaces(state): SpaceInfo[] {
+      return state.spaces || getAuthCache<SpaceInfo[]>(SPACES_KEY) || [];
     },
   },
   actions: {
@@ -101,26 +100,26 @@ export const useUserStore = defineStore({
       this.userInfo = info;
       this.lastUpdateTime = new Date().getTime();
       if (info != null) {
-        this.setRole(info.role)
-        this.setCurrentSpaceId(info.current_space_id)
-        this.setSpaces(info.spaces)
+        this.setRole(info.role);
+        this.setCurrentSpaceId(info.current_space_id);
+        this.setSpaces(info.spaces);
       }
       setAuthCache(USER_INFO_KEY, info);
     },
     setSessionTimeout(flag: boolean) {
       this.sessionTimeout = flag;
     },
-    setRole(role:string) {
-      this.role = role
-      setAuthCache(ROLE_KEY, role)
+    setRole(role: string) {
+      this.role = role;
+      setAuthCache(ROLE_KEY, role);
     },
-    setCurrentSpaceId(currentSpaceId:number) {
-      this.currentSpaceId = currentSpaceId
-      setAuthCache(CURRENT_SPACE_ID_KEY, currentSpaceId)
+    setCurrentSpaceId(currentSpaceId: number) {
+      this.currentSpaceId = currentSpaceId;
+      setAuthCache(CURRENT_SPACE_ID_KEY, currentSpaceId);
     },
-    setSpaces(spaces:SpaceInfo[]) {
-      this.spaces = spaces
-      setAuthCache(SPACES_KEY, spaces)
+    setSpaces(spaces: SpaceInfo[]) {
+      this.spaces = spaces;
+      setAuthCache(SPACES_KEY, spaces);
     },
     resetState() {
       this.userInfo = null;
@@ -145,7 +144,7 @@ export const useUserStore = defineStore({
         // save token
         this.setToken(token);
         if (refresh_token) {
-          this.setRefreshToken(refresh_token)
+          this.setRefreshToken(refresh_token);
         }
         return this.afterLoginAction(goHome);
       } catch (error) {
@@ -210,19 +209,14 @@ export const useUserStore = defineStore({
 
     async doRefreshToken() {
       if (this.refreshToken) {
-        try {
-          let data = await refreshToken(this.refreshToken);
-          const {token, refresh_token} = data
-          this.setToken(token);
-          this.setRefreshToken(refresh_token);
-          return
-        } catch(e) {
-          throw e
-        }
+        const data = await refreshToken(this.refreshToken);
+        const { token, refresh_token } = data;
+        this.setToken(token);
+        this.setRefreshToken(refresh_token);
+        return;
       } else {
-        throw new Error("refresh empty")
+        throw new Error('refresh empty');
       }
-
     },
 
     /**

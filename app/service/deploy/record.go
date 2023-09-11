@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"go.uber.org/zap"
@@ -9,33 +8,11 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"os/exec"
-	"sync"
 	"time"
+	bytes2 "yema.dev/app/internal/bytes"
 	"yema.dev/app/model"
 	"yema.dev/app/pkg/ssh"
 )
-
-type cmdOutput struct {
-	mux sync.RWMutex
-	buf bytes.Buffer
-	w   io.Writer
-}
-
-func (w *cmdOutput) Write(b []byte) (n int, err error) {
-	w.mux.Lock()
-	defer w.mux.Unlock()
-	n, err = w.buf.Write(b)
-	if err != nil {
-		return n, err
-	}
-	return w.w.Write(b)
-}
-
-func (w *cmdOutput) Bytes() []byte {
-	w.mux.RLock()
-	defer w.mux.RUnlock()
-	return w.buf.Bytes()
-}
 
 type Record struct {
 	db  *gorm.DB
@@ -45,7 +22,7 @@ type Record struct {
 	model  *model.Record
 	server *model.Server
 	envs   *ssh.Envs
-	output io.Writer //此次执行日志
+	output *bytes2.Buffer //此次执行日志
 
 	startTime time.Time
 }
@@ -60,7 +37,7 @@ func NewRecordLocal(db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, taskId, userId i
 			Status:   -1,
 			Envs:     envs.SliceKV(),
 		},
-		output: &cmdOutput{buf: bytes.Buffer{}, w: releaseOutput},
+		output: bytes2.NewBuffer(releaseOutput),
 
 		envs: envs,
 
@@ -81,7 +58,7 @@ func NewRecordRemote(db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, taskId, userId 
 			Envs:     envs.SliceKV(),
 		},
 
-		output: &cmdOutput{buf: bytes.Buffer{}, w: releaseOutput},
+		output: bytes2.NewBuffer(releaseOutput),
 
 		server: server,
 		envs:   envs,
@@ -111,6 +88,7 @@ func (r *Record) Run(ctx context.Context) (err error) {
 			_ = command.Close()
 		}()
 		err = command.WithEnvs(r.envs).RunCtx(ctx, r.model.Command)
+		r.model.Output = r.output.String()
 	}
 	if err != nil {
 		if e, ok := err.(*ssh2.ExitError); ok {
@@ -139,12 +117,12 @@ func (r *Record) Save(status int, output string) error {
 	}
 	r.model.Status = status
 	r.model.Output = output + "\r\n"
-	r.output.Write([]byte(r.model.Output))
+	r.output.WriteString(r.model.Output)
 	return r.save()
 }
 
 func (r *Record) Output() string {
-	return string(r.output.(*cmdOutput).Bytes())
+	return r.output.String()
 }
 
 func (r *Record) save() error {

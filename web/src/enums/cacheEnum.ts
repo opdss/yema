@@ -31,8 +31,7 @@ export const CURRENT_SPACE_ID_KEY = 'CURRENT__SPACE__ID__KEY__';
 
 export const SPACES_KEY = 'SPACES__KEY__';
 
-export const APP_SESSION_CACHE_KEY = 'APP__SESSION__CACHE__KEY__';
-
+export const APP_SESSION_CACHE_KEY = 'COMMON__SESSION__KEY__';
 
 export const DEF_ENV_CACHE_KEY = 'DEF__ENV__CACHE__KEY__';
 

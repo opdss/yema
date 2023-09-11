@@ -1,5 +1,5 @@
-import { BasicPageParams, BasicFetchResult } from '/@/api/model/baseModel';
-import {ListItem as SpaceListItem} from '/@/api/space/model'
+import { BasicPageParams, BasicFetchResult } from '../baseModel';
+import { ListItem as SpaceListItem } from '/@/api/space/model';
 
 export type ListReq = BasicPageParams & {
   name?: string;

@@ -71,6 +71,7 @@ export function usePermission() {
       }
       return (intersection(value, userStore.getRoleList) as RoleEnum[]).length > 0;
     }
+
     return true;
   }
 

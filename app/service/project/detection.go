@@ -17,6 +17,34 @@ import (
 	"yema.dev/app/service/common"
 )
 
+const (
+	msgTypeMsg     = 0
+	msgTypeSuccess = 1
+	msgTypeError   = 2
+)
+
+type write struct {
+	mux sync.Mutex
+	buf bytes.Buffer
+}
+
+func (w *write) Write(b []byte) (n int, err error) {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	return w.buf.Write(b)
+}
+
+func (w *write) Reset() {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	w.buf.Reset()
+}
+func (w *write) String() string {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	return w.buf.String()
+}
+
 func sendDetectionMsgFn(ch chan<- *DetectionMsg) func(title, todo, err string, serverId int64) {
 	return func(title, todo, err string, serverId int64) {
 		ch <- &DetectionMsg{
@@ -32,31 +60,19 @@ func sendDetectionMsgFn(ch chan<- *DetectionMsg) func(title, todo, err string, s
 func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.SpaceWithId) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), srv.detectionTimeout)
 	dMsgChan := make(chan *DetectionMsg)
-	defer close(dMsgChan)
-	sendMsg := sendDetectionMsgFn(dMsgChan)
-	isOver := false
 	defer func() {
-		if !isOver {
-			_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
-		}
+		close(dMsgChan)
 	}()
+	sendMsg := sendDetectionMsgFn(dMsgChan)
 
 	//检测逻辑
 	go func() {
 		var err error
 		defer func() {
 			if _err := recover(); _err != nil {
-				srv.log.Error("1.DetectionWs 已关闭写入渠道", zap.Any("_err", _err))
-				_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
-			} else {
-				isOver = true
-				if err == nil {
-					_ = wsConn.WriteMessage(websocket.TextMessage, []byte("success"))
-				} else {
-					_ = wsConn.WriteMessage(websocket.TextMessage, []byte("error"))
-				}
-				cancel()
+				srv.log.Error("1.DetectionWs 已关闭写入渠道", zap.Any("panic", _err))
 			}
+			cancel()
 		}()
 
 		srv.log.Info("获取数据库项目信息")
@@ -66,7 +82,7 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 			sendMsg("检测项目不存在", "请检查项目是否存在，或者刷新页面再尝试", "", 0)
 			return
 		}
-		//clone项目代码
+
 		srv.log.Info("clone仓库代码")
 		_, err = srv.repo.New(repo.TypeRepo(project.RepoType), project.RepoUrl, strconv.Itoa(int(project.ID)))
 		if err != nil {
@@ -85,22 +101,29 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 		for _, server := range project.Servers {
 			g.Add(1)
 			go func(server model.Server) {
+				var err error
 				defer func() {
 					if _err := recover(); _err != nil {
-						srv.log.Error("2.DetectionWs 已关闭写入渠道", zap.Any("_err", _err))
+						srv.log.Error("2.DetectionWs 已关闭写入渠道", zap.Any("panic", _err))
+					}
+					if err != nil {
+						srv.log.Error("项目检测服务器失败",
+							zap.Int64("ProjectId", project.ID),
+							zap.String("server", server.Hostname()),
+							zap.Error(err))
 					}
 					g.Done()
 				}()
 
 				srv.log.Info("连接服务器", zap.String("server", server.Hostname()))
-				buf := bytes.Buffer{}
-				re, _err := srv.ssh.NewRemoteExec(ssh.ServerConfig{User: server.User, Port: server.Port, Host: server.Host}, &buf)
-				if _err != nil {
-					sendMsg("远程目标机器免密码登录失败",
+				buf := write{}
+				var re *ssh.RemoteExec
+				re, err = srv.ssh.NewRemoteExec(ssh.ServerConfig{User: server.User, Port: server.Port, Host: server.Host}, &buf)
+				if err != nil {
+					sendMsg("远程目标机器免密码登录连接失败",
 						fmt.Sprintf("在宿主机中配置免密码登录，把宿主机用户[%s]的~/.ssh/id_rsa.pub添加到远程目标机器用户[%s]的~/.ssh/authorized_keys", server.User, server.User),
-						_err.Error(),
+						err.Error(),
 						server.ID)
-					err = _err
 					return
 				}
 				defer func() { _ = re.Close() }()
@@ -108,37 +131,36 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 				srv.log.Info("服务器创建发布目录", zap.String("server", server.Hostname()))
 				webroot := filepath.Dir(project.TargetRoot)
 				cmd := fmt.Sprintf("[ -d %s ] || mkdir -p %s", webroot, webroot)
-				_err = re.Run(cmd)
-				if _err != nil {
+				err = re.Run(cmd)
+				if err != nil {
 					sendMsg("远程目标机器创建目录失败",
 						fmt.Sprintf("请检查远程目标服务器用户[%s]的权限，失败执行命令：%s", server.User, cmd),
-						_err.Error(),
+						err.Error(),
 						server.ID)
-					err = _err
 					return
 				}
 
 				srv.log.Info("服务器检查软链接", zap.String("server", server.Hostname()))
 				cmd = fmt.Sprintf("[ -L \"%s\" ] && echo \"true\" || echo \"false\"", project.TargetRoot)
 				buf.Reset()
-				_err = re.Run(cmd)
-				if _err != nil {
+				err = re.Run(cmd)
+				if err != nil {
 					sendMsg("目标机器执行命令失败",
 						fmt.Sprintf("请检查远程目标服务器用户[%s]的权限，失败执行命令：%s", server.User, cmd),
-						_err.Error(),
+						err.Error(),
 						server.ID)
-					err = _err
 					return
 				}
 				if buf.String() == "false" {
+					err = fmt.Errorf("远程目标机器%s webroot不能是已存在的目录，必须为软链接，你不必新建，walle会自行创建。", server.Host)
 					sendMsg("远程目标机器webroot不能是已建好的目录",
 						"手工删除远程目标机器："+server.Host+" webroot目录："+project.TargetRoot,
-						"远程目标机器%s webroot不能是已存在的目录，必须为软链接，你不必新建，walle会自行创建。",
+						err.Error(),
 						server.ID)
-					err = _err
 					return
 				}
 			}(server)
+
 		}
 		g.Wait()
 	}()
@@ -160,6 +182,13 @@ func (srv *Service) DetectionWs(wsConn *websocket.Conn, spaceWithId *common.Spac
 			if err != nil {
 				cancel()
 				return Error.New("DetectionWs wsConn.WriteMessage error:%s", err)
+			}
+		default:
+			_, msg, err := wsConn.ReadMessage()
+			if err != nil {
+				srv.log.Error("ws.ReadMessage err:", zap.ByteString("msg", msg), zap.Error(err))
+				cancel()
+				return nil
 			}
 		}
 	}

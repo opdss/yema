@@ -94,7 +94,7 @@ func (d *deploy) Stop(taskId int64) error {
 	if _, ok := d.tasks[taskId]; ok {
 		d.tasks[taskId].cancel()
 	}
-	return nil
+	return ErrorTaskFinish
 }
 
 // Output 部署日志输出

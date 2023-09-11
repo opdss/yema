@@ -11,12 +11,14 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+	"yema.dev/app/internal/bytes"
 	"yema.dev/app/model"
 	"yema.dev/app/pkg/repo"
 	"yema.dev/app/pkg/ssh"
@@ -38,18 +40,6 @@ func (r RemoteErrs) Error() string {
 		return true
 	})
 	return res
-}
-
-func (r RemoteErrs) HasSuccess() bool {
-	flag := false
-	r.Range(func(key, value any) bool {
-		if value == nil {
-			flag = true
-			return false
-		}
-		return true
-	})
-	return flag
 }
 
 type deployDirs struct {
@@ -77,6 +67,11 @@ func (dd *deployDirs) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+type step struct {
+	step   int8
+	status int8
+}
+
 type Task struct {
 	db   *gorm.DB
 	log  *zap.Logger
@@ -92,15 +87,20 @@ type Task struct {
 
 	doneError chan error
 
-	taskLogs map[int64]*TaskLog
+	steps map[int64]*step
+
+	taskLogs map[int64]*bytes.BufferOver
 }
 
 func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, repo *repo.Repos) (*Task, error) {
-	taskLogs := make(map[int64]*TaskLog)
+	taskLogs := make(map[int64]*bytes.BufferOver)
+	steps := make(map[int64]*step)
 	for i := range taskModel.Servers {
-		taskLogs[taskModel.Servers[i].ID] = &TaskLog{}
+		taskLogs[taskModel.Servers[i].ID] = bytes.NewBufferOver()
+		steps[taskModel.Servers[i].ID] = &step{}
 	}
-	taskLogs[localServerId] = &TaskLog{}
+	taskLogs[localServerId] = bytes.NewBufferOver()
+	steps[localServerId] = &step{}
 	return &Task{
 		db:   db,
 		log:  log,
@@ -110,6 +110,7 @@ func NewTask(taskModel *model.Task, db *gorm.DB, log *zap.Logger, ssh *ssh.Ssh, 
 		doneError: make(chan error),
 		model:     taskModel,
 		taskLogs:  taskLogs,
+		steps:     steps,
 	}, nil
 }
 
@@ -137,7 +138,7 @@ func (t *Task) Start(ctx context.Context) (err error) {
 	t.model.Status = model.TaskStatusRelease
 	t.model.Version = t.createReleaseVersion()
 	err = t.db.Model(model.Task{}).Where("id = ? and status=?", t.model.ID, model.TaskStatusAudit).
-		Select("status", "link_id").UpdateColumns(t.model).Error
+		Select("status", "Version").UpdateColumns(t.model).Error
 	if err != nil {
 		return Error.Wrap(err)
 	}
@@ -149,8 +150,16 @@ func (t *Task) Start(ctx context.Context) (err error) {
 }
 
 // prevDeploy step1.检出代码前置操作
-func (t *Task) prevDeploy(ctx context.Context) error {
+func (t *Task) prevDeploy(ctx context.Context) (err error) {
 	//1、检查仓库，
+	t.steps[localServerId].step = 1
+	defer func() {
+		if err != nil {
+			t.steps[localServerId].status = 2
+		} else {
+			t.steps[localServerId].status = 1
+		}
+	}()
 	t.log.Debug("1.1、检查仓库")
 	_repo, err := t.getRepo()
 	if err != nil {
@@ -179,12 +188,21 @@ func (t *Task) prevDeploy(ctx context.Context) error {
 }
 
 // deploy step2.检出代码
-func (t *Task) deploy(ctx context.Context) error {
+func (t *Task) deploy(ctx context.Context) (err error) {
+	t.steps[localServerId].step = 2
+	defer func() {
+		if err != nil {
+			t.steps[localServerId].status = 2
+		} else {
+			t.steps[localServerId].status = 1
+		}
+	}()
 	//1、检出代码
 	t.log.Debug("2.1、检出代码")
 	_repo, err := t.getRepo()
 	if err != nil {
-		return errors.New("获取代码仓库错误：" + err.Error())
+		err = errors.New("获取代码仓库错误：" + err.Error())
+		return
 	}
 	if t.model.Tag != "" {
 		err = _repo.CheckoutToTag(t.model.Tag)
@@ -199,20 +217,29 @@ func (t *Task) deploy(ctx context.Context) error {
 	//2、复制发布版本代码到新目录，以便下面执行编译等操作
 	t.log.Debug("2.2、复制发布版本代码到新目录，以便下面执行编译等操作")
 	if _, err = files.CopyDirToDir(t.deployDirs.localWarehouseDir, _repo.Path()); err != nil {
-		return errors.New("检出代码失败：" + err.Error())
+		err = errors.New("检出代码失败：" + err.Error())
+		return
 	}
 	return nil
 }
 
 // postDeploy step3.推送到服务器前的操作，比如下载依赖，编译等
-func (t *Task) postDeploy(ctx context.Context) error {
+func (t *Task) postDeploy(ctx context.Context) (err error) {
+	t.steps[localServerId].step = 3
+	defer func() {
+		if err != nil {
+			t.steps[localServerId].status = 2
+		} else {
+			t.steps[localServerId].status = 1
+		}
+	}()
 	//1、在检出代码执行用户发布前命令
 	t.log.Debug("3.1、在检出代码执行用户发布前命令")
 	commands := parseCommands(t.model.Project.PostDeploy)
 	for _, cmd := range commands {
 		cmd = fmt.Sprintf("cd %s && %s", t.deployDirs.localWarehouseDir, cmd)
 		r := t.newRecordLocal(cmd, t.envs())
-		if err := r.Run(ctx); err != nil {
+		if err = r.Run(ctx); err != nil {
 			return err
 		}
 	}
@@ -221,7 +248,7 @@ func (t *Task) postDeploy(ctx context.Context) error {
 	cmd := fmt.Sprintf("tar -zcvf %s -C %s", t.deployDirs.localCodePackage, t.deployDirs.localWarehouseDir)
 	record := t.newRecordLocal(cmd, nil)
 	record.SetSaveTime()
-	err := compress.PackMatch(t.deployDirs.localCodePackage, t.deployDirs.localWarehouseDir, t.getFileMatch())
+	err = compress.PackMatch(t.deployDirs.localCodePackage, t.deployDirs.localWarehouseDir, t.getFileMatch())
 	if err != nil {
 		_ = record.Save(254, "打包代码出错:"+err.Error())
 		return err
@@ -260,7 +287,15 @@ func (t *Task) remoteRun(ctx context.Context, server *model.Server) error {
 }
 
 // prevRelease step4.推送代码到服务器前的操作
-func (t *Task) prevRelease(ctx context.Context, server *model.Server) error {
+func (t *Task) prevRelease(ctx context.Context, server *model.Server) (err error) {
+	t.steps[server.ID].step = 4
+	defer func() {
+		if err != nil {
+			t.steps[server.ID].status = 2
+		} else {
+			t.steps[server.ID].status = 1
+		}
+	}()
 	//解压程序包
 	//_tarCmd := fmt.Sprintf("mkdir -p %s ", filepath.Dir(t.deployDirs.remoteReleasePackage))
 	//r := NewRecord(model.RecordTypePrevRelease, t.model.ID, t.userId, _tarCmd, server, t.envs())
@@ -304,12 +339,20 @@ func (t *Task) prevRelease(ctx context.Context, server *model.Server) error {
 }
 
 // release step5.部署程序
-func (t *Task) release(ctx context.Context, server *model.Server) error {
+func (t *Task) release(ctx context.Context, server *model.Server) (err error) {
+	t.steps[server.ID].step = 5
+	defer func() {
+		if err != nil {
+			t.steps[server.ID].status = 2
+		} else {
+			t.steps[server.ID].status = 1
+		}
+	}()
 	//1、获取上一个部署版本，保存下来
 	t.log.Debug("5.1、获取上一个部署版本，保存下来", zap.String("server", server.Hostname()))
 	cmd := fmt.Sprintf("[ -L %s ] && readlink %s || echo \"\"", t.deployDirs.remoteRootLink, t.deployDirs.remoteRootLink)
 	record := t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(ctx); err != nil {
+	if err = record.Run(ctx); err != nil {
 		return err
 	}
 	t.model.PrevVersion = record.Output()
@@ -319,14 +362,14 @@ func (t *Task) release(ctx context.Context, server *model.Server) error {
 	tmpLink := fmt.Sprintf("%s_tmp", t.deployDirs.remoteRootLink)
 	cmd = fmt.Sprintf("mkdir -p %s && ln -sfn %s %s", filepath.Dir(t.deployDirs.remoteRootLink), t.deployDirs.remoteReleaseDir, tmpLink)
 	record = t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(ctx); err != nil {
+	if err = record.Run(ctx); err != nil {
 		return err
 	}
 
 	t.log.Debug("5.3、更新数据库记录", zap.String("server", server.Hostname()))
 	cmd = fmt.Sprintf("mv -fT %s %s", tmpLink, t.deployDirs.remoteRootLink)
 	record = t.newRecordRemote(cmd, server, t.envs())
-	if err := record.Run(ctx); err != nil {
+	if err = record.Run(ctx); err != nil {
 		return err
 	}
 	t.db.Select("prev_version").UpdateColumns(t.model)
@@ -334,13 +377,21 @@ func (t *Task) release(ctx context.Context, server *model.Server) error {
 }
 
 // postRelease 6、执行部署完成功后用户相关命令
-func (t *Task) postRelease(ctx context.Context, server *model.Server) error {
+func (t *Task) postRelease(ctx context.Context, server *model.Server) (err error) {
+	t.steps[server.ID].step = 6
+	defer func() {
+		if err != nil {
+			t.steps[server.ID].status = 2
+		} else {
+			t.steps[server.ID].status = 1
+		}
+	}()
 	t.log.Debug("6.1、执行部署完成功后用户相关命令", zap.String("server", server.Hostname()))
 	commands := parseCommands(t.model.Project.PostRelease)
 	for _, cmd := range commands {
 		cmd = fmt.Sprintf("cd %s && %s", t.deployDirs.remoteRootLink, cmd)
 		r := t.newRecordRemote(cmd, server, t.envs())
-		if err := r.Run(ctx); err != nil {
+		if err = r.Run(ctx); err != nil {
 			return err
 		}
 	}
@@ -357,15 +408,12 @@ loopFor:
 			break loopFor
 		default:
 			err = f(ctx)
-			fmt.Println("start", err)
 			if err != nil {
 				break loopFor
 			}
 		}
 	}
-	fmt.Println("over")
 	t.doneError <- err
-	fmt.Println("over", err)
 }
 
 // Output 发布日志即时输出
@@ -384,12 +432,14 @@ func (t *Task) Output(ctx context.Context) <-chan *ConsoleMsg {
 			default:
 			}
 			for k, off := range offsetMap {
-				_data := make([]byte, 10)
+				_data := make([]byte, 360)
 				n, err := t.taskLogs[k].ReadAt(_data, off)
 				offsetMap[k] += n
 				_data = _data[:n]
 				if n > 0 {
 					msg <- &ConsoleMsg{
+						Step:     t.steps[k].step,
+						Status:   t.steps[k].status,
 						ServerId: k,
 						Data:     string(_data),
 					}
@@ -411,7 +461,6 @@ func (t *Task) Output(ctx context.Context) <-chan *ConsoleMsg {
 func (t *Task) Wait() error {
 	doneErr := <-t.doneError
 	close(t.doneError)
-	fmt.Println("t.doneError", t.doneError)
 	for i := range t.taskLogs {
 		t.taskLogs[i].WriteOver()
 	}
@@ -420,10 +469,42 @@ func (t *Task) Wait() error {
 	if doneErr != nil {
 		t.model.LastError = doneErr.Error()
 		t.model.Status = model.TaskStatusReleaseFail
+		updates := make([]*model.TaskServer, 0)
 		if re, ok := doneErr.(RemoteErrs); ok {
-			if re.HasSuccess() {
-				t.model.Status = model.TaskStatusFinish
+			t.model.Status = model.TaskStatusReleasePartFail
+			re.Range(func(key, value any) bool {
+				if value != nil {
+					updates = append(updates, &model.TaskServer{
+						TaskId:   t.model.ID,
+						ServerId: key.(int64),
+						Status:   model.TaskServerStatusFail,
+						Err:      value.(error).Error(),
+					})
+				} else {
+					updates = append(updates, &model.TaskServer{
+						TaskId:   t.model.ID,
+						ServerId: key.(int64),
+						Status:   model.TaskServerStatusSuccess,
+					})
+				}
+				return true
+			})
+		} else {
+			for _, s := range t.model.Servers {
+				updates = append(updates, &model.TaskServer{
+					TaskId:   t.model.ID,
+					ServerId: s.ID,
+					Status:   model.TaskServerStatusSuccess,
+				})
 			}
+		}
+		_err := t.db.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "task_id"}, {Name: "server_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "err"}),
+		}).Create(&updates).Error
+		if _err != nil {
+			_s, _ := json.Marshal(updates)
+			t.log.Debug("更新服务器部署状态出错", zap.ByteString("updates", _s), zap.Error(_err))
 		}
 	}
 	mb, _ := json.Marshal(t.model)
@@ -464,11 +545,9 @@ func (t *Task) getFileMatch() compress.Match {
 				regs = append(regs, v)
 			}
 		}
-		fmt.Println("regs", regs)
 		if len(regs) == 0 {
 			return nil
 		}
-
 		if t.model.Project.IsInclude == model.ProjectIsInclude {
 			return compress.FileMatch(regs...)
 		}
@@ -478,6 +557,7 @@ func (t *Task) getFileMatch() compress.Match {
 }
 
 func (t *Task) getRepo() (repo.Repo, error) {
+	fmt.Println(repo.TypeRepo(t.model.Project.RepoType), t.model.Project.RepoUrl, fmt.Sprintf("%d", t.model.Project.ID))
 	return t.repo.New(repo.TypeRepo(t.model.Project.RepoType), t.model.Project.RepoUrl, fmt.Sprintf("%d", t.model.Project.ID))
 }
 

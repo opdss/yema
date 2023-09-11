@@ -29,7 +29,7 @@ const deploy: AppRouteModule = {
       name: 'DeployCreate',
       component: () => import('/@/views/deploy/create.vue'),
       meta: {
-        title: "新建上线单",
+        title: '新建上线单',
         icon: 'ant-design:code-outlined',
         hideMenu: true,
       },
@@ -39,7 +39,7 @@ const deploy: AppRouteModule = {
       name: 'DeployCreateForm',
       component: () => import('/@/views/deploy/create_form.vue'),
       meta: {
-        title: "新建上线单",
+        title: '新建上线单',
         icon: 'ant-design:code-outlined',
         hideMenu: true,
       },
@@ -49,7 +49,7 @@ const deploy: AppRouteModule = {
       name: 'DeployRelease',
       component: () => import('/@/views/deploy/release.vue'),
       meta: {
-        title: "控制台",
+        title: '控制台',
         icon: 'ant-design:code-outlined',
         hideMenu: true,
       },
@@ -59,7 +59,7 @@ const deploy: AppRouteModule = {
       name: 'DeployProcessForm',
       component: () => import('/@/views/deploy/process.vue'),
       meta: {
-        title: "发布中",
+        title: '发布中',
         icon: 'ant-design:code-outlined',
         hideMenu: true,
       },

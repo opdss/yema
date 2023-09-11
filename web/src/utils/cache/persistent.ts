@@ -13,12 +13,16 @@ import {
   APP_LOCAL_CACHE_KEY,
   APP_SESSION_CACHE_KEY,
   ROLE_KEY,
-  MULTIPLE_TABS_KEY, CURRENT_SPACE_ID_KEY, SPACES_KEY, DEF_ENV_CACHE_KEY, REFRESH_TOKEN_KEY,
+  MULTIPLE_TABS_KEY,
+  CURRENT_SPACE_ID_KEY,
+  SPACES_KEY,
+  DEF_ENV_CACHE_KEY,
+  REFRESH_TOKEN_KEY,
 } from '/@/enums/cacheEnum';
 import { DEFAULT_CACHE_TIME } from '/@/settings/encryptionSetting';
 import { toRaw } from 'vue';
 import { pick, omit } from 'lodash-es';
-import {SpaceInfo} from "/@/api/user/model";
+import { SpaceInfo } from '/@/api/login/model';
 
 interface BasicStore {
   [TOKEN_KEY]: string | number | null | undefined;

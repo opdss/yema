@@ -11,7 +11,7 @@ const project: AppRouteModule = {
   meta: {
     hideChildrenInMenu: true,
     icon: 'ant-design:user-outlined',
-    title: "成员管理",
+    title: '成员管理',
   },
   children: [
     {

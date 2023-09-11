@@ -1,14 +1,12 @@
-import {BasicFetchResult, BasicPageParams} from '/@/api/model/baseModel';
-import {RoleEnum} from "/@/enums/roleEnum";
+import { BasicFetchResult, BasicPageParams } from '../baseModel';
+import { RoleEnum } from '/@/enums/roleEnum';
 
-export type ListReq = BasicPageParams & {
-};
+export type ListReq = BasicPageParams & {};
 
 export interface StoreReq {
   user_id: number;
   role: RoleEnum;
 }
-
 
 export interface ListItem {
   user_id: number;

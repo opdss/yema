@@ -200,6 +200,20 @@ func (srv *Service) Console(wsConn *websocket.Conn, spaceAndId *common.SpaceWith
 		}
 	}
 
+	//go func() {
+	//	select {
+	//	case <-ctx.Done():
+	//		return
+	//	default:
+	//		_, msg, err := wsConn.ReadMessage()
+	//		if err != nil {
+	//			srv.log.Error("ws read err", zap.ByteString("msg", msg), zap.Error(err))
+	//			cancel()
+	//			return
+	//		}
+	//	}
+	//}()
+
 	for _msg := range msg {
 		select {
 		case <-ctx.Done():
@@ -236,7 +250,13 @@ func (srv *Service) getReleaseFromDb(ctx context.Context, taskId int64) (_ <-cha
 				} else {
 					host = v.Server.Hostname()
 				}
+				s := 1
+				if v.Status > 0 {
+					s = 2
+				}
 				msg <- &ConsoleMsg{
+					Step:     v.Step,
+					Status:   int8(s),
 					ServerId: v.Server.ID,
 					Data:     fmt.Sprintf("%s $ %s\r\n%s", host, v.Command, v.Output),
 				}

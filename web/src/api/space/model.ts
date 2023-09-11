@@ -1,5 +1,5 @@
-import { BasicPageParams, BasicFetchResult } from '/@/api/model/baseModel';
-import {ListItem as UserListItem} from '/@/api/user/model'
+import { BasicPageParams, BasicFetchResult } from '../baseModel';
+import { ListItem as UserListItem } from '/@/api/user/model';
 
 export type ListReq = BasicPageParams & {
   name?: string;
@@ -22,7 +22,7 @@ export interface ListItem {
   status: number;
   created_at: number;
   user: UserListItem;
-  [key: string] : any;
+  [key: string]: any;
 }
 
 export type ListItemRes = BasicFetchResult<ListItem>;

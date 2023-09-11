@@ -1,8 +1,8 @@
-import { BasicPageParams, BasicFetchResult } from '/@/api/model/baseModel';
-import {ListItem as EnvListItem} from '/@/api/environment/model'
-import {ListItem as ProjectListItem} from '/@/api/project/model'
-import {ListItem as UserListItem} from '/@/api/user/model'
-import {ListItem as ServerListItem} from '/@/api/server/model'
+import { BasicPageParams, BasicFetchResult } from '../baseModel';
+import { ListItem as EnvListItem } from '/@/api/environment/model';
+import { ListItem as ProjectListItem } from '/@/api/project/model';
+import { ListItem as UserListItem } from '/@/api/user/model';
+import { ListItem as ServerListItem } from '/@/api/server/model';
 
 export type ListReq = BasicPageParams & {
   name?: string;
@@ -32,14 +32,21 @@ export interface ListItem {
 }
 
 export interface RecordItem {
-  id : number;
+  id: number;
   type: number;
   status: number;
   server_id: number;
   command: string;
   output: string;
   created_at: string;
-  [key: string]:any;
+  [key: string]: any;
+}
+
+export interface ReleaseOutput {
+  server_id: number;
+  step: number;
+  status: number;
+  data: string;
 }
 
 export type ListItemRes = BasicFetchResult<ListItem>;

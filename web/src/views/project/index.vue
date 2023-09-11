@@ -21,6 +21,10 @@
                   confirm: handleDelete.bind(null, record),
                 },
               },
+              {
+                icon: 'ant-design:exclamation-circle-outlined',
+                onClick: handleDetail.bind(null, record),
+              },
             ]"
           />
         </template>
@@ -31,16 +35,17 @@
 <script lang="ts">
   import { defineComponent } from 'vue';
   import { BasicTable, useTable, TableAction } from '/@/components/Table';
+  import { useModal } from '/@/components/Modal';
   import { columns, searchFormSchema } from './data';
   import { useMessage } from '/@/hooks/web/useMessage';
-  import {getProjectListByPage, deleteProject} from "/@/api/project"
+  import { getProjectListByPage, deleteProject } from '/@/api/project';
   import { useGo } from '/@/hooks/web/usePage';
 
   export default defineComponent({
     name: 'ProjectManagement',
     components: { BasicTable, TableAction },
     setup() {
-      const go = useGo()
+      const go = useGo();
       const { createMessage } = useMessage();
       const [registerTable, { reload }] = useTable({
         title: '项目管理',
@@ -55,31 +60,39 @@
         bordered: true,
         showIndexColumn: false,
         actionColumn: {
-          width: 80,
+          width: 120,
           title: '操作',
           dataIndex: 'action',
           // slots: { customRender: 'action' },
-          fixed: "right",
+          fixed: 'right',
         },
       });
 
       function handleCreate() {
-       go("/project/create")
+        go('/project/create');
       }
 
       function handleEdit(record: Recordable) {
-        go(`/project/update/${record.id}`)
+        go(`/project/update/${record.id}`);
       }
 
       function handleDelete(record: Recordable) {
-        deleteProject(record.id).then(()=>{
-          createMessage.success("删除成功")
-          reload()
-        })
+        deleteProject(record.id).then(() => {
+          createMessage.success('删除成功');
+          reload();
+        });
       }
 
       function handleSuccess() {
         reload();
+      }
+
+      function handleCheck(record: Recordable) {
+        go(`/project/detection/${record.id}`);
+      }
+
+      function handleDetail(record: Recordable) {
+        go(`/project/detail/${record.id}`);
       }
 
       return {
@@ -88,6 +101,7 @@
         handleEdit,
         handleDelete,
         handleSuccess,
+        handleDetail,
       };
     },
   });
